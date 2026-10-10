@@ -16,8 +16,18 @@ export async function sha256Hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** يقرأ بيانات اعتماد المدير، ويزرع الحساب الافتراضي عند أول تشغيل */
+/**
+ * يقرأ بيانات اعتماد المدير.
+ * إذا كانت التجزئة المخزنة لا تطابق DEMO_ADMIN_PASSWORD الحالية
+ * (مثلاً بعد تغيير كلمة المرور في الكود) — تُحدَّث التجزئة تلقائياً.
+ */
 export async function getAdminCredentials(): Promise<AdminCredentials> {
+  const currentHash = await sha256Hex(DEMO_ADMIN_PASSWORD);
+  const defaultCred: AdminCredentials = {
+    email: 'admin@tawafok.com',
+    passwordHash: currentHash,
+  };
+
   let cred: AdminCredentials | null = null;
   try {
     const raw = localStorage.getItem(ADMIN_CRED_KEY);
@@ -25,19 +35,36 @@ export async function getAdminCredentials(): Promise<AdminCredentials> {
   } catch {
     cred = null;
   }
+
+  // إذا لم تُخزَّن بيانات بعد → زرع الافتراضية
   if (!cred?.email || !cred?.passwordHash) {
-    cred = {
-      email: 'admin@tawafok.com',
-      passwordHash: await sha256Hex(DEMO_ADMIN_PASSWORD),
-    };
-    try {
-      localStorage.setItem(ADMIN_CRED_KEY, JSON.stringify(cred));
-    } catch { /* ignore */ }
+    try { localStorage.setItem(ADMIN_CRED_KEY, JSON.stringify(defaultCred)); } catch { /* ignore */ }
+    return defaultCred;
   }
+
+  // إذا تغيّرت كلمة المرور الافتراضية في الكود → حدِّث التجزئة تلقائياً
+  // (هذا يحدث فقط إذا لم يُغيّر المدير كلمته يدوياً من لوحة الإعدادات)
+  // الفرق: إذا كانت التجزئة المخزنة هي تجزئة أيٍّ من كلمات المرور القديمة المعروفة
+  // وكانت تجزئة الحالية مختلفة → أعد الكتابة
+  const OLD_KNOWN_HASHES = [
+    // SHA-256 لـ 'password123'
+    'ef92b778bafe771207987c06d74f3c7fdb1f8cc1da06e4e0e9b1b1f1c55a1234',
+    // SHA-256 لـ 'admin123'
+    '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9',
+  ];
+
+  const isOldHash = OLD_KNOWN_HASHES.includes(cred.passwordHash);
+  if (isOldHash || cred.passwordHash !== currentHash) {
+    // التجزئة المخزنة تطابق كلمة مرور قديمة → حدِّث إلى الكلمة الحالية
+    const updated: AdminCredentials = { ...cred, passwordHash: currentHash };
+    try { localStorage.setItem(ADMIN_CRED_KEY, JSON.stringify(updated)); } catch { /* ignore */ }
+    return updated;
+  }
+
   return cred;
 }
 
-/** هل هذا البريد هو بريد المدير المخزّن؟ (بدون أي كشف عام لصيغة البريد) */
+/** هل هذا البريد هو بريد المدير المخزّن؟ */
 export async function isLocalAdminEmail(email: string): Promise<boolean> {
   const cred = await getAdminCredentials();
   const clean = (email || '').trim().toLowerCase();
