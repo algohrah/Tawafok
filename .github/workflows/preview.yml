@@ -1,0 +1,55 @@
+name: Build and publish journey-v2 preview
+
+on:
+  push:
+    branches: [feature/journey-v2]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-preview-v2
+  cancel-in-progress: true
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/journey-v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Patch pages base path for preview subfolder
+        run: |
+          sed -i "s#'/tawasul-marriage-platform/'#'/Tawafok/preview/'#" vite.config.ts || true
+          sed -i "s#base:.*'/Tawafok/'#base: '/Tawafok/preview/'#" vite.config.ts || true
+
+      - name: Build preview
+        run: npm run build
+        env:
+          VITE_DATABASE_PROVIDER: local
+          VITE_BASE_PATH: /Tawafok/preview/
+
+      - name: Prepare static files
+        run: |
+          rm -f dist/server.cjs dist/server.cjs.map
+          cp dist/index.html dist/404.html
+          touch dist/.nojekyll
+
+      - name: Deploy to gh-pages/preview subfolder
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: dist
+          destination_dir: preview
+          keep_files: true
+          force_orphan: false
