@@ -754,11 +754,17 @@ export function resetLocalDB() {
 // التحقق مما إذا كان المستخدم قد دفع رسوم الجدية في أي طلب سابق (لإثبات الجدية بشكل دائم)
 export function hasUserPaidDepositAnywhere(userId: string): boolean {
   const d = load();
-  return d.requests.some(
-    (r) =>
-      (r.sender_id === userId && r.sender_paid && r.sender_paid_at) ||
-      (r.receiver_id === userId && r.receiver_paid && r.receiver_paid_at)
-  );
+  return d.requests.some((r) => {
+    if (r.sender_id === userId) {
+      const ds = (r as any).sender_deposit_status;
+      return (ds === 'confirmed' || ds === 'exempted') || (r.sender_paid && r.sender_paid_at);
+    }
+    if (r.receiver_id === userId) {
+      const ds = (r as any).receiver_deposit_status;
+      return (ds === 'confirmed' || ds === 'exempted') || (r.receiver_paid && r.receiver_paid_at);
+    }
+    return false;
+  });
 }
 
 // محاكاة تأخير شبكة بسيط (اختياري)
@@ -1251,6 +1257,92 @@ export async function runRequestAction(
       }
       evType = 'system';
       break;
+    // ===== Actions جديدة v2 =====
+    case 'admin_confirm_deposit': {
+      // تأكيد سداد العربون (500 ريال) من طرف معين
+      const side = payload.side as 'sender' | 'receiver'; // 'sender' | 'receiver'
+      const amountPaid = payload.amount_paid ?? 500;
+      const isExempt = payload.exempt === true;
+      if (side === 'sender') {
+        (req as any).sender_deposit_status = isExempt ? 'exempted' : 'confirmed';
+        (req as any).sender_deposit_amount_paid = isExempt ? 0 : amountPaid;
+        req.sender_paid = !isExempt;
+        if (!isExempt) req.sender_paid_at = now;
+      } else {
+        (req as any).receiver_deposit_status = isExempt ? 'exempted' : 'confirmed';
+        (req as any).receiver_deposit_amount_paid = isExempt ? 0 : amountPaid;
+        req.receiver_paid = !isExempt;
+        if (!isExempt) req.receiver_paid_at = now;
+      }
+      // إذا سدّد الطرفان → نقل تلقائي إلى coordinating
+      const sDs = (req as any).sender_deposit_status;
+      const rDs = (req as any).receiver_deposit_status;
+      const sOk = sDs === 'confirmed' || sDs === 'exempted' || req.sender_paid;
+      const rOk = rDs === 'confirmed' || rDs === 'exempted' || req.receiver_paid;
+      if (sOk && rOk && req.journey_stage === 'accepted') {
+        req.journey_stage = 'coordinating';
+        evNote = `تأكيد سداد ${side === 'sender' ? 'المرسِل' : 'المستقبِل'} — تم نقل الطلب إلى مرحلة التنسيق`;
+      } else {
+        evNote = `تأكيد ${isExempt ? 'إعفاء' : 'سداد'} العربون للـ${side === 'sender' ? 'مرسِل' : 'مستقبِل'} — المبلغ: ${amountPaid} ريال`;
+      }
+      evType = 'system';
+      break;
+    }
+    case 'admin_set_final_fee_due': {
+      // تسجيل استحقاق رسوم الخاتمة (2000 ريال) بعد تسليم المهر
+      (req as any).sender_final_fee_status = 'due';
+      (req as any).receiver_final_fee_status = 'due';
+      evNote = `تم تسجيل استحقاق رسوم الخاتمة (2000 ريال لكل طرف) بعد تسليم المهر — ${payload.note || ''}`;
+      evType = 'system';
+      break;
+    }
+    case 'admin_confirm_final_fee': {
+      // تأكيد سداد رسوم الخاتمة من طرف معين
+      const ffSide = payload.side as 'sender' | 'receiver';
+      const ffAmount = payload.amount_paid ?? 2000;
+      const ffExempt = payload.exempt === true;
+      if (ffSide === 'sender') {
+        (req as any).sender_final_fee_status = ffExempt ? 'exempted' : 'paid';
+        (req as any).sender_final_fee_amount_paid = ffExempt ? 0 : ffAmount;
+        req.sender_final_paid = !ffExempt;
+        if (!ffExempt) req.sender_final_paid_at = now;
+      } else {
+        (req as any).receiver_final_fee_status = ffExempt ? 'exempted' : 'paid';
+        (req as any).receiver_final_fee_amount_paid = ffExempt ? 0 : ffAmount;
+        req.receiver_final_paid = !ffExempt;
+        if (!ffExempt) req.receiver_final_paid_at = now;
+      }
+      evNote = `تأكيد ${ffExempt ? 'إعفاء' : 'سداد'} رسوم الخاتمة للـ${ffSide === 'sender' ? 'مرسِل' : 'مستقبِل'} — المبلغ: ${ffAmount} ريال`;
+      evType = 'system';
+      break;
+    }
+    case 'admin_close_journey': {
+      // إغلاق الرحلة مع سبب
+      const validReasons = ['match', 'no_match', 'withdrawn_sender', 'withdrawn_receiver', 'timeout', 'admin_closed'];
+      const closeReason = validReasons.includes(payload.reason) ? payload.reason : 'admin_closed';
+      (req as any).close_reason = closeReason;
+      (req as any).close_note = payload.note || '';
+      if (closeReason === 'match') {
+        req.journey_stage = 'closed';
+        req.evaluation_result = 'success';
+      } else if (closeReason === 'withdrawn_sender' || closeReason === 'withdrawn_receiver') {
+        req.journey_stage = 'cancelled';
+        req.cancel_reason = payload.note || closeReason;
+      } else {
+        req.journey_stage = 'closed';
+        req.evaluation_result = 'failed';
+      }
+      evNote = `إغلاق الرحلة — السبب: ${closeReason}${payload.note ? ' — ' + payload.note : ''}`;
+      evType = 'system';
+      break;
+    }
+    case 'whatsapp_contacted': {
+      // تسجيل التواصل عبر واتساب (لا يغير المرحلة)
+      (req as any).whatsapp_contacted_at = now;
+      evNote = `تم التواصل عبر واتساب في: ${new Date(now).toLocaleDateString('ar-SA')}`;
+      evType = 'system';
+      break;
+    }
     default:
       return { ok: false, error: 'إجراء غير معروف: ' + action };
   }
@@ -2862,3 +2954,4 @@ export interface LocalTransaction {
   date?: string;
   couponCode?: string;
 }
+
