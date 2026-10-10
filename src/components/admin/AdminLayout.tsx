@@ -13,7 +13,7 @@ import { useApp } from '../../lib/AppContext';
 import { verifyLocalAdmin } from '../../lib/adminAuth';
 import { DEMO_ADMIN_PASSWORD } from '../../lib/constants';
 import { useReviewMarkers } from '../../lib/useReviewMarkers';
-import supabaseClient from '../../lib/supabase';
+import authClient from '../../lib/authClient';
 
 import AdminErrorBoundary from './AdminErrorBoundary';
 import AdminQuickSearch from './AdminQuickSearch';
@@ -73,7 +73,7 @@ function isAdminEmailLocal(email: string): boolean {
 /** يتحقق من صلاحية الإدارة عبر الجلسة أو التحقق من الخادم أو بيانات الدخول المعتمدة */
 async function verifyAdminSession(): Promise<boolean> {
   try {
-    const { data: { session } } = await supabaseClient.auth.getSession();
+    const { data: { session } } = await authClient.auth.getSession();
     if (session?.access_token) {
       const res = await fetch('/api/whoami', { headers: { Authorization: `Bearer ${session.access_token}` } }).catch(() => null);
       if (res && res.ok) {
@@ -114,7 +114,7 @@ export default function AdminLayout() {
   useEffect(() => {
     let mounted = true;
     verifyAdminSession().then((ok) => { if (mounted) setAuthState(ok ? 'authed' : 'denied'); });
-    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange(() => {
+    const { data: { subscription } } = authClient.auth.onAuthStateChange(() => {
       verifyAdminSession().then((ok) => { if (mounted) setAuthState(ok ? 'authed' : 'denied'); });
     });
     return () => { mounted = false; subscription.unsubscribe(); };
@@ -127,7 +127,7 @@ export default function AdminLayout() {
       localStorage.removeItem('twafok_active_admin_email');
       localStorage.removeItem('twafok_current_admin_user');
     }
-    supabaseClient.auth.signOut().catch(() => undefined);
+    authClient.auth.signOut().catch(() => undefined);
     setAuthState('denied');
   };
 
@@ -825,7 +825,7 @@ function AdminLoginScreen({ onLoginSuccess }: { onLoginSuccess: () => void }) {
       if (!(await verifyLocalAdmin(cleanEmail, adminPassword))) {
         throw new Error('البريد الإلكتروني أو كلمة المرور غير صحيحة');
       }
-      const { error: localError } = await supabaseClient.auth.signInWithPassword({ email: cleanEmail, password: adminPassword });
+      const { error: localError } = await authClient.auth.signInWithPassword({ email: cleanEmail, password: adminPassword });
       if (localError) throw new Error((localError as any)?.message || 'تعذّر إنشاء الجلسة المحلية');
       let matchedAdmin: any = null;
       try {
@@ -841,7 +841,7 @@ function AdminLoginScreen({ onLoginSuccess }: { onLoginSuccess: () => void }) {
       }
       return;
     }
-    const { error: sessionError } = await supabaseClient.auth.setSession({
+    const { error: sessionError } = await authClient.auth.setSession({
       access_token: result.accessToken,
       refresh_token: result.refreshToken,
     });

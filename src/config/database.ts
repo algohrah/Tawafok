@@ -1,7 +1,6 @@
-export type DatabaseProvider = 'api' | 'local' | 'supabase';
+// إعداد قاعدة البيانات — المنصة تعمل بقاعدة بيانات محلية SQLite فقط
+export type DatabaseProvider = 'local';
 
 export const DATABASE_CONFIG = {
-  // الوضع الافتراضي: local — تشغيل فوري وسلس في المتصفح بكامل الوظائف وبدون أخطاء 404
-  PROVIDER: (((typeof import.meta !== 'undefined' && import.meta?.env?.VITE_DATABASE_PROVIDER) || 'local') as DatabaseProvider),
+  PROVIDER: 'local' as DatabaseProvider,
 };
-

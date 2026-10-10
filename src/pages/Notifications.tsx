@@ -11,7 +11,7 @@ import {
   getUnifiedNotifications, markAllUnifiedNotificationsRead, deleteUnifiedNotification,
   markUnifiedNotificationRead, type UnifiedNotification,
 } from '../lib/notifications';
-import supabase from '../lib/supabase';
+import authClient from '../lib/authClient';
 
 const typeConfig = {
   like: { icon: Heart, color: 'text-rose-deep bg-rose-deep/10' },
@@ -41,16 +41,16 @@ export default function Notifications() {
 
   useEffect(() => { loadNotifications(); }, [loadNotifications]);
 
-  // اشتراك لحظي حقيقي عبر Supabase Realtime — يُحدّث القائمة فور وصول إشعار جديد بدل الفحص الدوري
+  // اشتراك لحظي حقيقي عبر الاشتراك اللحظي المحلي — يُحدّث القائمة فور وصول إشعار جديد بدل الفحص الدوري
   useEffect(() => {
-    if (!activeId || typeof supabase?.channel !== 'function') return;
-    const channel = supabase
+    if (!activeId || typeof authClient?.channel !== 'function') return;
+    const channel = authClient
       .channel(`notifications-page-${activeId}`)
       ?.on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${activeId}` }, () => {
         loadNotifications();
       })
       ?.subscribe();
-    return () => { if (channel && typeof supabase?.removeChannel === 'function') supabase.removeChannel(channel); };
+    return () => { if (channel && typeof authClient?.removeChannel === 'function') authClient.removeChannel(channel); };
   }, [activeId, loadNotifications]);
 
   const markAll = async () => {

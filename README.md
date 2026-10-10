@@ -45,7 +45,8 @@ npm run dev
 
 ```
 src/lib/sqliteDb.ts            تهيئة SQLite + الترحيل + الكتابة المرورية
+src/lib/authClient.ts          عميل المصادقة المحلي (جلسات محلية بلا خدمات خارجية)
+src/lib/adminAuth.ts           مصادقة الإدارة بتجزئة SHA-256
 src/lib/data/DataService.ts    نقطة الوصول الموحدة لقاعدة البيانات
 src/lib/data/adapters/local/   مخازن البيانات المحلية (أعضاء، تحقق، جغرافيا)
-api/                           مسارات API لوضع الخادم عند التطوير المحلي فقط
 ```

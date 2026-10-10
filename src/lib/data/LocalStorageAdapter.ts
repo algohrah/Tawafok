@@ -539,8 +539,8 @@ export class LocalStorageAdapter implements IDatabaseAdapter {
   ensureGeoLoaded = async (): Promise<void> => { geoStore.refreshGeoDB(); };
 }
 
-export type DatabaseProvider = 'local' | 'supabase' | 'appwrite';
+export type DatabaseProvider = 'local';
 
 export const DATABASE_CONFIG = {
-  PROVIDER: 'supabase' as DatabaseProvider,
+  PROVIDER: 'local' as DatabaseProvider,
 };

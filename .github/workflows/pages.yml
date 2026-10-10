@@ -17,32 +17,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-
+          cache: npm
       - name: Install dependencies
         run: npm install --legacy-peer-deps --no-audit --no-fund
-
-      - name: Patch pages base path
-        run: sed -i "s#'/tawasul-marriage-platform/'#'/Tawafok/'#" vite.config.ts
-
       - name: Build local-data preview
         run: npm run build
         env:
           VITE_DATABASE_PROVIDER: local
-
       - name: Prepare static preview
         run: |
           rm -f dist/server.cjs dist/server.cjs.map
           cp dist/index.html dist/404.html
           touch dist/.nojekyll
-
       - name: Publish gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
-          publish_dir: dist
+          publish_dir: ./dist
           force_orphan: true

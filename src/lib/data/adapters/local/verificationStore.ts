@@ -2,9 +2,9 @@
 //  إدارة مستندات التوثيق — تخزين في localStorage
 // ============================================================
 
-import supabaseClient, { hasRealSupabase } from '../../../supabase';
+import authClient, { cloudSyncEnabled } from '../../../authClient';
 
-const isReal = typeof window !== 'undefined' && hasRealSupabase;
+const isReal = typeof window !== 'undefined' && cloudSyncEnabled;
 let vdocs: VerificationDocument[] | null = null;
 
 export type VerificationStatus = 'none' | 'pending' | 'approved' | 'rejected';
@@ -39,10 +39,10 @@ function saveAll(docs: VerificationDocument[]) {
   try {
     if (isReal) {
         Promise.resolve(
-          supabaseClient
+          authClient
             .from('settings')
             .upsert({ key: STORAGE_KEY, value: JSON.stringify(docs), updated_at: new Date().toISOString() })
-        ).catch((err) => console.warn('[verificationStore] Failed to sync vdocs to Supabase settings:', err));
+        ).catch((err) => console.warn('[verificationStore] Failed to sync vdocs to local settings:', err));
     }
   } catch { /* تجاهل */ }
 }
@@ -50,7 +50,7 @@ function saveAll(docs: VerificationDocument[]) {
 export async function syncVerificationDocsFromCloud(): Promise<void> {
   if (!isReal) return;
   try {
-    const { data, error } = await supabaseClient
+    const { data, error } = await authClient
       .from('settings')
       .select('value')
       .eq('key', STORAGE_KEY)
@@ -61,11 +61,11 @@ export async function syncVerificationDocsFromCloud(): Promise<void> {
       const parsed = JSON.parse(data.value);
       if (Array.isArray(parsed)) {
         vdocs = parsed;
-        console.info('[verificationStore] Successfully synchronized verification documents from Supabase cloud!');
+        console.info('[verificationStore] Successfully synchronized verification documents from local database!');
       }
     }
   } catch (err) {
-    console.warn('[verificationStore] Failed to fetch verification docs from Supabase.', err);
+    console.warn('[verificationStore] Failed to fetch verification docs from local database.', err);
   }
 }
 

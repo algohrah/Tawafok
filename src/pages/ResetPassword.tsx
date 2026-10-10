@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Lock, Eye, EyeOff, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-import supabase from '../lib/supabase';
+import authClient from '../lib/authClient';
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -15,12 +15,12 @@ export default function ResetPassword() {
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
 
-  // رابط إعادة تعيين كلمة المرور من البريد ينشئ جلسة مؤقتة تلقائياً عبر Supabase عند تحميل الصفحة
+  // رابط إعادة تعيين كلمة المرور من البريد ينشئ جلسة مؤقتة تلقائياً عبر قاعدة البيانات المحلية عند تحميل الصفحة
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    authClient.auth.getSession().then(({ data: { session } }) => {
       setReady(!!session);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = authClient.auth.onAuthStateChange((_event, session) => {
       if (session) setReady(true);
     });
     return () => subscription.unsubscribe();
@@ -34,7 +34,7 @@ export default function ResetPassword() {
 
     setLoading(true);
     try {
-      const { error: updateError } = await supabase.auth.updateUser({ password });
+      const { error: updateError } = await authClient.auth.updateUser({ password });
       if (updateError) {
         setError(updateError.message);
       } else {

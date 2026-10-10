@@ -3,7 +3,7 @@ import { ClipboardList, Search, UserX, CheckCircle2, Trash2, Edit3, ShieldCheck,
 import { useApp } from '../../lib/AppContext';
 import FilterDropdown from '../../components/admin/FilterDropdown';
 import PageHeader from '../../components/admin/PageHeader';
-import supabase from '../../lib/supabase';
+import authClient from '../../lib/authClient';
 
 const actionConfig: Record<string, { label: string; icon: any; color: string }> = {
   delete_member: { label: 'حذف عضو', icon: Trash2, color: 'text-red-600 bg-red-50' },
@@ -46,7 +46,7 @@ export default function AdminAuditLog() {
     setLoading(true);
     setError(null);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await authClient.auth.getSession();
       const token = session?.access_token;
       const res = await fetch('/api/audit-log?limit=300', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!res.ok) {

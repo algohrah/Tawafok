@@ -14,7 +14,7 @@ import {
 import SearchableSelect from '../components/ui/SearchableSelect';
 import MultiSearchableSelect from '../components/ui/MultiSearchableSelect';
 import { useApp } from '../lib/AppContext';
-import supabase from '../lib/supabase';
+import authClient from '../lib/authClient';
 import { translitArabicToEnglish } from '../lib/types';
 import * as C from '../lib/constants';
 import {
@@ -157,7 +157,7 @@ export default function Register() {
   const [checkingEmail, setCheckingEmail] = useState(false);
   const lastCheckedEmail = useRef('');
 
-  // بعد الضغط على رابط تأكيد البريد يعيد Supabase المستخدم إلى هذه الصفحة.
+  // بعد الضغط على رابط تأكيد البريد يعيد قاعدة البيانات المحلية المستخدم إلى هذه الصفحة.
   // نكمل إنشاء ملف العضو باستخدام الجلسة المؤكدة والبيانات المحفوظة مؤقتًا،
   // من دون حفظ كلمة المرور في المتصفح.
   useEffect(() => {
@@ -174,7 +174,7 @@ export default function Register() {
       setSubmitSuccess('جارٍ إكمال إنشاء ملفك بعد تأكيد البريد...');
 
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await authClient.auth.getSession();
         if (!session) {
           setSubmitSuccess('');
           setSubmitError('تم تأكيد البريد، لكن الجلسة لم تكتمل. سجّل الدخول بالبريد وكلمة المرور لإكمال حسابك.');
@@ -600,7 +600,7 @@ export default function Register() {
     setSubmitError('');
     setSubmitSuccess('');
 
-    // إعادة التحقق من بيانات الحساب قبل أي طلب إلى Supabase. هذا يمنع
+    // إعادة التحقق من بيانات الحساب قبل أي طلب إلى قاعدة البيانات المحلية. هذا يمنع
     // إرسال طلبات إنشاء حساب عند اختلاف كلمتي المرور أو خطأ البريد.
     if (!validateStep(3)) {
       setStep(3);
@@ -633,7 +633,7 @@ export default function Register() {
       };
 
       // 1) إنشاء حساب Auth مؤكد من المسار الخادمي. لا يعتمد هذا المسار على
-      // رسائل Supabase التجريبية، ولذلك لا يتأثر بحد إرسال البريد العالمي.
+      // رسائل قاعدة البيانات المحلية التجريبية، ولذلك لا يتأثر بحد إرسال البريد العالمي.
       const cleanEmail = form.email.trim().toLowerCase();
       const createResponse = await fetch('/api/register-auth', {
         method: 'POST',
@@ -648,7 +648,7 @@ export default function Register() {
       }
 
       // 2) تسجيل الدخول بالحساب الجديد للحصول على جلسة حقيقية قبل إنشاء الملف.
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      const { data: signInData, error: signInError } = await authClient.auth.signInWithPassword({
         email: cleanEmail,
         password: form.password,
       });

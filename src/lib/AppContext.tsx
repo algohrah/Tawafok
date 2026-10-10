@@ -2,7 +2,7 @@ import { normalizePlan, memberPlan, isFeatured, dailyRequestLimit, requestDay } 
 import { dataService } from './data/DataService';
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { pushToast, dismissToastById } from './toastBus';
-import supabaseClient from './supabase';
+import authClient from './authClient';
 import { DEMO_ADMIN_PASSWORD } from './constants';
 
 // ===== أدوات مزامنة الجداول الحقيقية (المصدر الوحيد للحقيقة) =====
@@ -154,7 +154,7 @@ interface AppContextType {
   /** إعادة محاولة تحميل الأعضاء من الخادم */
   retryLoadMembers: () => void;
   login: (name: string, memberId?: string) => void;
-  /** تسجيل دخول حقيقي عبر Supabase Auth — يستقبل بيانات العضو المرتبط بحساب المصادقة الفعلي */
+  /** تسجيل دخول حقيقي عبر قاعدة البيانات المحلية Auth — يستقبل بيانات العضو المرتبط بحساب المصادقة الفعلي */
   loginWithSession: (memberRow: any, authEmail: string) => void;
   logout: () => void;
   registerNewMember: (memberData: any) => Promise<{ ok: boolean; error?: string }>;
@@ -1403,7 +1403,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (Object.keys(dbFields).length > 0) {
         let token: string | null = null;
         try {
-          const { data } = await supabaseClient.auth.getSession();
+          const { data } = await authClient.auth.getSession();
           token = data?.session?.access_token || null;
         } catch { /* ignore */ }
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -1963,7 +1963,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ========== SYNC AND INITIALIZE SETTINGS FROM CLOUD ==========
   useEffect(() => {
     async function initAndSync() {
-      // 1. If Supabase is active, sync settings from cloud to localStorage
+      // 1. If قاعدة البيانات المحلية is active, sync settings from cloud to localStorage
       const dbAny = dataService.db as any;
       if (typeof dbAny.syncSettingsFromCloud === 'function') {
         try {
@@ -2052,29 +2052,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     initAndSync();
   }, []);
-
-  useEffect(() => {
-    const handleDbError = (e: Event) => {
-      const err = (e as CustomEvent).detail;
-      console.error('[Database Error Event]:', err);
-      const message = err?.message || '';
-      if (err?.code === '42P01' || message.includes('does not exist') || message.includes('relation "public.')) {
-        showToast('خطأ في قاعدة البيانات: الجداول غير موجودة أو لم يتم تهيئة هيكل قاعدة البيانات في Supabase بعد. يرجى مراجعة ملف مشروع SQL لتثبيت الجداول.', 'error');
-      } else if (err?.code === 'PGRST116' || err?.code === 'PGRST301' || message.includes('JWT') || message.includes('apiKey')) {
-        showToast('فشل التحقق من صلاحيات المفاتيح أو الـ RLS في Supabase. يرجى تصحيح إعدادات الحماية في لوحة التحكم.', 'error');
-      } else {
-        showToast('خطأ في الاتصال بقاعدة البيانات (Supabase): ' + (message || 'يرجى التحقق من اتصال الشبكة والمفاتيح.'), 'error');
-      }
-    };
-    if (typeof window !== 'undefined') {
-      window.addEventListener('supabase-db-error', handleDbError);
-    }
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('supabase-db-error', handleDbError);
-      }
-    };
-  }, [showToast]);
 
   useEffect(() => {
     if (!isInitialized) return;
@@ -2340,7 +2317,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  /** تسجيل دخول حقيقي — يُستدعى بعد نجاح Supabase Auth وجلب بيانات العضو المرتبط عبر /api/whoami */
+  /** تسجيل دخول حقيقي — يُستدعى بعد نجاح قاعدة البيانات المحلية Auth وجلب بيانات العضو المرتبط عبر /api/whoami */
   const loginWithSession = (memberRow: any, authEmail: string) => {
     if (!memberRow) return;
     const newUser: AuthUser = {
@@ -2374,7 +2351,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       dataService.db.settings.remove('active_member_id');
       dataService.db.settings.remove('impersonating');
     }
-    supabaseClient.auth.signOut().catch(() => undefined);
+    authClient.auth.signOut().catch(() => undefined);
   };
 
   const registerNewMember = useCallback(async (memberData: any): Promise<{ ok: boolean; error?: string }> => {
@@ -2574,7 +2551,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       return { ok: true };
     } catch (err: any) {
-      console.error('Error saving member to Supabase:', err);
+      console.error('Error saving member to local database:', err);
       return { ok: false, error: err?.message || 'تعذّر إنشاء الحساب، حاول مرة أخرى' };
     }
   }, [setMembers, setAdminMembers]);
@@ -2760,7 +2737,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (async () => {
       let token: string | null = null;
       try {
-        const { data } = await supabaseClient.auth.getSession();
+        const { data } = await authClient.auth.getSession();
         token = data?.session?.access_token || null;
       } catch { /* ignore */ }
       const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };

@@ -20,7 +20,7 @@ import {
   getMemberCustomLists, isMemberInCustomList, getListColorStyles, DEFAULT_LIST_COLORS, type CustomMemberList
 } from '../../lib/customLists';
 import { dataService } from '../../lib/data/DataService';
-import supabase from '../../lib/supabase';
+import authClient from '../../lib/authClient';
 
 import Modal from '../../components/ui/Modal';
 import MemberCard from '../../components/MemberCard';
@@ -3766,7 +3766,7 @@ export default function AdminMembers() {
                   {revealSensitive && selectedLive.email && (
                     <button
                       onClick={async () => {
-                        const { error } = await supabase.auth.resetPasswordForEmail(selectedLive.email, {
+                        const { error } = await authClient.auth.resetPasswordForEmail(selectedLive.email, {
                           redirectTo: `${window.location.origin}/reset-password`,
                         });
                         showLocalToast(error ? 'تعذّر إرسال رابط إعادة التعيين' : `تم إرسال رابط إعادة تعيين كلمة المرور إلى ${selectedLive.email} ✓`);

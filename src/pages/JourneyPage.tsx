@@ -23,7 +23,7 @@ import {
 } from '../lib/journey';
 import RequestStatusPanel from '../components/requests/RequestStatusPanel';
 import PaymentGateway from '../components/payments/PaymentGateway';
-import supabase from '../lib/supabase';
+import authClient from '../lib/authClient';
 
 function stageOf(r: ApiRequest, activeUserId: string): JourneyState {
   return getJourneyStage(r, activeUserId);
@@ -92,16 +92,16 @@ export default function JourneyPage() {
     };
   }, [load]);
 
-  // اشتراك لحظي حقيقي عبر Supabase Realtime — تنعكس إجراءات الطرف الآخر (قبول/رفض/دفع...) فوراً بدون تحديث الصفحة
+  // اشتراك لحظي حقيقي عبر الاشتراك اللحظي المحلي — تنعكس إجراءات الطرف الآخر (قبول/رفض/دفع...) فوراً بدون تحديث الصفحة
   useEffect(() => {
-    if (!rid || typeof supabase?.channel !== 'function') return;
-    const channel = supabase
+    if (!rid || typeof authClient?.channel !== 'function') return;
+    const channel = authClient
       .channel(`interest-request-${rid}`)
       ?.on('postgres_changes', { event: '*', schema: 'public', table: 'interest_requests', filter: `id=eq.${rid}` }, () => {
         load();
       })
       ?.subscribe();
-    return () => { if (channel && typeof supabase?.removeChannel === 'function') supabase.removeChannel(channel); };
+    return () => { if (channel && typeof authClient?.removeChannel === 'function') authClient.removeChannel(channel); };
   }, [rid, load]);
 
   const runAction = async (action: string, payload: Record<string, any> = {}) => {
@@ -988,16 +988,16 @@ function InquiryRoom({ req, other, inquiry, setInquiry, showToast, onProceedDepo
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [inquiry.messages.length, typing]);
 
-  // اشتراك لحظي حقيقي عبر Supabase Realtime — تظهر رسائل الطرف الآخر فوراً بدون إعادة تحميل الصفحة
+  // اشتراك لحظي حقيقي عبر الاشتراك اللحظي المحلي — تظهر رسائل الطرف الآخر فوراً بدون إعادة تحميل الصفحة
   useEffect(() => {
-    if (!req?.id || typeof supabase?.channel !== 'function') return;
-    const channel = supabase
+    if (!req?.id || typeof authClient?.channel !== 'function') return;
+    const channel = authClient
       .channel(`inquiry-messages-${req.id}`)
       ?.on('postgres_changes', { event: '*', schema: 'public', table: 'inquiry_messages', filter: `request_id=eq.${req.id}` }, () => {
         reload?.();
       })
       ?.subscribe();
-    return () => { if (channel && typeof supabase?.removeChannel === 'function') supabase.removeChannel(channel); };
+    return () => { if (channel && typeof authClient?.removeChannel === 'function') authClient.removeChannel(channel); };
   }, [req?.id, reload]);
 
   const hasPackage = !!inquiry.inquiry_started_by || inquiry.remaining > 0;

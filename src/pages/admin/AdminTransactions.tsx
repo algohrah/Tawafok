@@ -3,7 +3,7 @@ import { CreditCard, Search, ArrowDownLeft, ArrowUpRight, Clock, CheckCircle2, X
 import { type Transaction } from '../../lib/types';
 import { dataService } from '../../lib/data/DataService';
 import { useApp } from '../../lib/AppContext';
-import supabase from '../../lib/supabase';
+import authClient from '../../lib/authClient';
 
 import FilterDropdown from '../../components/admin/FilterDropdown';
 import PageHeader from '../../components/admin/PageHeader';
@@ -13,7 +13,7 @@ const getTransactions = () => dataService.db.getTransactions();
 async function reviewTransaction(id: string | number, approve: boolean): Promise<{ ok: boolean; error?: string }> {
   const targetStatus = approve ? 'completed' : 'failed';
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await authClient.auth.getSession();
     const token = session?.access_token;
     const res = await fetch('/api/transactions', {
       method: 'PUT',

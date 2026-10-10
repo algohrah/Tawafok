@@ -14,7 +14,7 @@ import {
   deleteUnifiedNotification,
   type UnifiedNotification
 } from '../../lib/notifications';
-import supabase from '../../lib/supabase';
+import authClient from '../../lib/authClient';
 
 const navLinks = [
   { to: '/', label: 'الرئيسية' },
@@ -70,10 +70,10 @@ export default function Header() {
     };
   }, [user.isLoggedIn, activeMemberId]);
 
-  // اشتراك لحظي حقيقي عبر Supabase Realtime — يُحدّث عدّاد الإشعارات فوراً عند وصول إشعار جديد
+  // اشتراك لحظي حقيقي عبر الاشتراك اللحظي المحلي — يُحدّث عدّاد الإشعارات فوراً عند وصول إشعار جديد
   useEffect(() => {
-    if (!user.isLoggedIn || !activeMemberId || typeof supabase?.channel !== 'function') return;
-    const channel = supabase
+    if (!user.isLoggedIn || !activeMemberId || typeof authClient?.channel !== 'function') return;
+    const channel = authClient
       .channel(`notifications-header-${activeMemberId}`)
       ?.on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${activeMemberId}` }, async () => {
         const count = await getUnifiedUnreadCount(activeMemberId);
@@ -81,7 +81,7 @@ export default function Header() {
         if (notifDropdownOpen) loadRecentNotifs();
       })
       ?.subscribe();
-    return () => { if (channel && typeof supabase?.removeChannel === 'function') supabase.removeChannel(channel); };
+    return () => { if (channel && typeof authClient?.removeChannel === 'function') authClient.removeChannel(channel); };
   }, [user.isLoggedIn, activeMemberId, notifDropdownOpen, loadRecentNotifs]);
 
   useEffect(() => {

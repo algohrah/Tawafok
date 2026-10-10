@@ -10,7 +10,7 @@ import {
 import { useAdminMembers } from '../../lib/useAdminData';
 import { useApp } from '../../lib/AppContext';
 import { dataService } from '../../lib/data/DataService';
-import supabase from '../../lib/supabase';
+import authClient from '../../lib/authClient';
 import * as C from '../../lib/constants';
 import {
   Field, TextInput, SelectInput, TextArea, RadioGroup,

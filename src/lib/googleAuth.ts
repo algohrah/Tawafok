@@ -1,4 +1,4 @@
-import supabase from './supabase';
+import authClient from './authClient';
 
 const isMobile = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
@@ -6,10 +6,8 @@ function buildGoogleUrl(appName: string) {
   const env = import.meta.env as Record<string, string | undefined>;
   const clientId = env.VITE_GOOGLE_CLIENT_ID;
   const redirectUri = env.VITE_GOOGLE_AUTH_PROXY;
-  const supabaseUrl = env.VITE_SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!clientId || !redirectUri) return null;
-  const state = btoa(JSON.stringify({ origin: window.location.origin, appName, supabaseUrl, supabaseAnonKey }));
+  const state = btoa(JSON.stringify({ origin: window.location.origin, appName }));
   return `{{https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}}}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&prompt=select_account&state=${encodeURIComponent(state)}`;
 }
 
@@ -30,10 +28,10 @@ export function signInWithGoogle(appName = 'تواصل للزواج') {
     if (event.data?.type !== 'google-auth-success') return;
     window.removeEventListener('message', handler);
     if (event.data.access_token && event.data.refresh_token) {
-      const { error } = await supabase.auth.setSession({ access_token: event.data.access_token, refresh_token: event.data.refresh_token });
+      const { error } = await authClient.auth.setSession({ access_token: event.data.access_token, refresh_token: event.data.refresh_token });
       if (error) console.error('[google-auth] setSession failed:', error.message);
     } else if (event.data.id_token) {
-      const { error } = await supabase.auth.signInWithIdToken({ provider: 'google', token: event.data.id_token });
+      const { error } = await authClient.auth.signInWithIdToken({ provider: 'google', token: event.data.id_token });
       if (error) console.error('[google-auth] signInWithIdToken failed:', error.message);
     }
   };
@@ -45,7 +43,7 @@ export async function handleGoogleRedirect() {
   const token = params.get('google_id_token');
   if (!token) return;
   window.history.replaceState({}, '', window.location.pathname);
-  const { error } = await supabase.auth.signInWithIdToken({ provider: 'google', token });
+  const { error } = await authClient.auth.signInWithIdToken({ provider: 'google', token });
   if (error) {
     console.error('[google-auth] signInWithIdToken failed:', error.message);
     return;

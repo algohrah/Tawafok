@@ -1,14 +1,14 @@
 // ============================================================
-//  مخزن الدول والمدن — إدارة كاملة عبر localStorage ومزامنة Supabase
+//  مخزن الدول والمدن — إدارة كاملة عبر localStorage ومزامنة قاعدة البيانات المحلية
 //  - قائمة رسمية للدول والمدن (قابلة للتعديل من الإدارة)
 //  - مدن مقترحة من المستخدمين بانتظار مراجعة الإدارة
 //  - استيراد/تصدير الدول أو مدن دولة معينة
 // ============================================================
 
 import { COUNTRIES as SEED_COUNTRIES, CITIES_BY_COUNTRY as SEED_CITIES } from '../../../constants';
-import supabaseClient, { hasRealSupabase } from '../../../supabase';
+import authClient, { cloudSyncEnabled } from '../../../authClient';
 
-const isReal = typeof window !== 'undefined' && hasRealSupabase;
+const isReal = typeof window !== 'undefined' && cloudSyncEnabled;
 
 // ===== الأنواع =====
 export interface PendingCity {
@@ -84,10 +84,10 @@ function save() {
       }
       if (isReal) {
         Promise.resolve(
-          supabaseClient
+          authClient
             .from('settings')
             .upsert({ key: STORAGE_KEY, value: raw, updated_at: new Date().toISOString() })
-        ).catch((err) => console.warn('[geoStore] Failed to sync geo db to Supabase settings:', err));
+        ).catch((err) => console.warn('[geoStore] Failed to sync geo db to local settings:', err));
       }
     } catch { /* تجاهل */ }
   }
@@ -96,7 +96,7 @@ function save() {
 export async function syncGeoDBFromCloud(): Promise<void> {
   if (!isReal) return;
   try {
-    const { data, error } = await supabaseClient
+    const { data, error } = await authClient
       .from('settings')
       .select('value')
       .eq('key', STORAGE_KEY)
@@ -110,11 +110,11 @@ export async function syncGeoDBFromCloud(): Promise<void> {
         if (!parsed.pendingCities) parsed.pendingCities = [];
         if (!parsed.seq) parsed.seq = 1;
         db = parsed;
-        console.info('[geoStore] Successfully synchronized countries and cities from Supabase cloud!');
+        console.info('[geoStore] Successfully synchronized countries and cities from local database!');
       }
     }
   } catch (err) {
-    console.warn('[geoStore] Failed to fetch geo db from Supabase.', err);
+    console.warn('[geoStore] Failed to fetch geo db from local database.', err);
   }
 }
 

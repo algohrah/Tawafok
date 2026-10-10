@@ -7,7 +7,7 @@ import { getAvatar } from '../lib/types';
 import { useApp } from '../lib/AppContext';
 import { verifyLocalAdmin, isLocalAdminEmail } from '../lib/adminAuth';
 import { DEMO_ADMIN_PASSWORD } from '../lib/constants';
-import supabase from '../lib/supabase';
+import authClient from '../lib/authClient';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -50,8 +50,8 @@ export default function Login() {
         } catch { /* ignore */ }
       }
 
-      // مصادقة حقيقية عبر Supabase Auth
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      // مصادقة حقيقية عبر قاعدة البيانات المحلية Auth
+      const { error: signInError } = await authClient.auth.signInWithPassword({ email: email.trim(), password });
 
       if (signInError) {
         if (localAdminVerified) {
@@ -82,7 +82,7 @@ export default function Login() {
       // محاولة التحقق عبر /api/whoami بأمان
       let who: any = null;
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await authClient.auth.getSession();
         const token = session?.access_token;
         if (token) {
           const res = await fetch('/api/whoami', { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
