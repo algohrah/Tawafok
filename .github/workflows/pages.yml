@@ -22,23 +22,18 @@ jobs:
         with:
           node-version: 22
 
-      - name: Extract project from zip
-        run: |
-          unzip -o "tawasul-marriageالاخير.zip" -d extracted
-          sed -i "s#'/tawasul-marriage-platform/'#'/Tawafok/'#" extracted/tawasul-marriage-platform-main/vite.config.ts
-
       - name: Install dependencies
-        working-directory: extracted/tawasul-marriage-platform-main
         run: npm install --legacy-peer-deps --no-audit --no-fund
 
+      - name: Patch pages base path
+        run: sed -i "s#'/tawasul-marriage-platform/'#'/Tawafok/'#" vite.config.ts
+
       - name: Build local-data preview
-        working-directory: extracted/tawasul-marriage-platform-main
         run: npm run build
         env:
           VITE_DATABASE_PROVIDER: local
 
       - name: Prepare static preview
-        working-directory: extracted/tawasul-marriage-platform-main
         run: |
           rm -f dist/server.cjs dist/server.cjs.map
           cp dist/index.html dist/404.html
@@ -49,5 +44,5 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
-          publish_dir: extracted/tawasul-marriage-platform-main/dist
+          publish_dir: dist
           force_orphan: true
