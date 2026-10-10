@@ -26,12 +26,12 @@ export class DataService {
     if (this.provider === 'local') {
       this.db = new LocalStorageAdapter();
       if (typeof window !== 'undefined') {
-        console.info('[DataService] Connected to Local Database (LocalStorage).');
+        console.info('[DataService] Connected to Local SQLite Database.');
       }
     } else {
       this.db = new ApiAdapter();
       if (typeof window !== 'undefined') {
-        console.info('[DataService] Connected to Supabase through Vercel API Routes.');
+        console.info('[DataService] Connected to API provider (server mode).');
       }
     }
   }

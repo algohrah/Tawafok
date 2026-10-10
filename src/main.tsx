@@ -3,10 +3,10 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
 import { handleGoogleRedirect } from './lib/googleAuth';
-import { initializeIndexedDbPersistence } from './lib/indexedDbPersistence';
+import { initializeSqliteDatabase } from './lib/sqliteDb';
 
 async function bootstrap() {
-  await initializeIndexedDbPersistence();
+  await initializeSqliteDatabase();
   handleGoogleRedirect();
 
   const container = document.getElementById('root');

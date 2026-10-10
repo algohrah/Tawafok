@@ -1,6 +1,25 @@
-# منصة تواصل للزواج
+# منصة توافق للزواج
 
-نسخة تطوير خاصة تعمل حاليًا دون Supabase أو Vercel. البيانات التجريبية تُحفظ محليًا داخل IndexedDB مع طبقة توافق للواجهة الحالية.
+منصة وساطة زواج تعمل بالكامل بقاعدة بيانات **SQLite محلية** داخل المتصفح — بدون أي خدمة خارجية أو خادم.
+
+## قاعدة البيانات
+
+- المحرك: **SQLite** عبر sql.js (WebAssembly) — ملف قاعدة بيانات حقيقي اسمه `app.sqlite`
+- الملف يُحفظ تلقائيًا في IndexedDB بالمتصفح ويُحمَّل كاملًا في الذاكرة عند الإقلاع
+- عند أول تشغيل تُرحَّل أي بيانات قديمة من localStorage إلى SQLite تلقائيًا
+- كل بيانات المنصة (الأعضاء، الطلبات، الإعدادات، الحسابات) تُخزَّن في SQLite
+- ملاحظة: البيانات محليّة لكل متصفح — حساب تنشئه في متصفح يظهر في نفس المتصفح
+
+## حساب الإدارة
+
+- البريد: `admin@tawafok.com`
+- كلمة المرور: `password123`
+- الدخول من صفحة `/login` أو من بوابة `/admin` مباشرة
+- كلمة المرور تُتحقق مقابل تجزئة SHA-256 مخزنة — لا يُمنح صلاحية الإدارة دون كلمة المرور الصحيحة
+
+## حسابات الأعضاء
+
+سجّل عضوًا جديدًا من صفحة `/register` (نموذج من 5 خطوات). التسجيل والدخول يعملان محليًا بالكامل.
 
 ## التشغيل المحلي
 
@@ -11,74 +30,22 @@ npm run dev
 
 ثم افتح `http://localhost:3000`.
 
-للتشغيل المحلي باستخدام البيانات المحلية:
+## النشر على GitHub Pages
 
-```env
-VITE_DATABASE_PROVIDER=local
+سير العمل `.github/workflows/pages.yml` يبنى ويُنشر تلقائيًا مع كل تحديث للفرع `main`:
+
+1. تثبيت الاعتماديات
+2. ضبط مسار القاعدة إلى `/Tawafok/`
+3. بناء المعاينة بوضع `VITE_DATABASE_PROVIDER=local` (SQLite محلي)
+4. نشر مجلد `dist` إلى فرع `gh-pages`
+
+رابط الموقع المنشور: `https://algohrah.github.io/Tawafok/`
+
+## البنية
+
 ```
-
-ولتشغيل API Routes مع Supabase، انسخ `.env.example` إلى `.env` وأضف مفتاح Supabase العام في `VITE_SUPABASE_ANON_KEY`. لا تضع مفتاح `service_role` في الواجهة أو في GitHub.
-
-## حساب الإدارة التجريبي
-
-- البريد: `admin@tawafok.com`
-- كلمة المرور: `password123`
-
-> حساب تجريبي فقط. لا تستخدم هذه البيانات في الإنتاج.
-
-## وضع البيانات
-
-```env
-VITE_DATABASE_PROVIDER=local
+src/lib/sqliteDb.ts            تهيئة SQLite + الترحيل + الكتابة المرورية
+src/lib/data/DataService.ts    نقطة الوصول الموحدة لقاعدة البيانات
+src/lib/data/adapters/local/   مخازن البيانات المحلية (أعضاء، تحقق، جغرافيا)
+api/                           مسارات API لوضع الخادم عند التطوير المحلي فقط
 ```
-
-بيانات كل متصفح مستقلة، وقد يؤدي حذف بيانات الموقع إلى حذفها.
-
-## إعداد Supabase للإنتاج
-
-تم تجهيز المستودع لقاعدة مشروع Supabase `Tawafok` عبر الإعدادات التالية:
-
-```env
-VITE_DATABASE_PROVIDER=api
-VITE_SUPABASE_URL=https://lzseyykpkputgfvgnddc.supabase.co
-NEXT_PUBLIC_SUPABASE_URL=https://lzseyykpkputgfvgnddc.supabase.co
-VITE_SUPABASE_ANON_KEY=<Supabase publishable/anon key>
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<Supabase publishable/anon key>
-SUPABASE_SERVICE_ROLE_KEY=<server-only key>
-```
-
-ضع هذه القيم في إعدادات الاستضافة (مثل Netlify)، وليس داخل ملفات GitHub. قيمة `SUPABASE_SERVICE_ROLE_KEY` خادمية فقط ولا يجوز كشفها للمتصفح.
-
-> ملاحظة: قاعدة `Tawafok` كانت فارغة وقت إعداد الربط. أُضيف مخطط الجداول والسياسات الأساسية، لكن يجب مراجعة سياسات RLS التفصيلية قبل فتح الوصول المباشر من المتصفح.
-
-## النشر على Netlify
-
-المشروع يستخدم Netlify Functions موحّدة لمسارات `/api/*`. ملف `netlify.toml` يضبط البناء، إعادة التوجيه، ووظيفة API تلقائيًا.
-
-في إعدادات الموقع على Netlify أضف:
-
-```env
-VITE_DATABASE_PROVIDER=api
-VITE_SUPABASE_URL=https://lzseyykpkputgfvgnddc.supabase.co
-VITE_SUPABASE_ANON_KEY=<Supabase publishable/anon key>
-NEXT_PUBLIC_SUPABASE_URL=https://lzseyykpkputgfvgnddc.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<Supabase publishable/anon key>
-SUPABASE_SERVICE_ROLE_KEY=<server-only key>
-```
-
-بعد الحفظ نفّذ **Deploy site** أو أعد نشر آخر commit. اختبر بعدها:
-
-- `/api/health`
-- `/api/members`
-
-يجب أن تعيد المسارات JSON بدل صفحة 404.
-
-## معاينة GitHub Pages
-
-بعد كل تحديث للفرع `main` ينفذ سير العمل `.github/workflows/pages.yml` بناء المعاينة ونشرها. من إعدادات المستودع اختر **Pages → GitHub Actions** كمصدر النشر.
-
-تظل معاينة GitHub Pages مضبوطة على `VITE_DATABASE_PROVIDER=local` لأنها موقع ثابت ولا يشغّل خادم API. استخدم Netlify لتشغيل الربط الكامل مع Supabase.
-
-## الإنتاج لاحقًا
-
-تُحفظ القيم السرية في إعدادات الاستضافة فقط، وليس داخل GitHub.

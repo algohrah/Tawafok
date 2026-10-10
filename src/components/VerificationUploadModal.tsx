@@ -45,7 +45,7 @@ export default function VerificationUploadModal({ open, onClose }: Props) {
 
     setProcessingKey(key);
     try {
-      // ضغط كل صورة إلى حجم مناسب حتى تُرفع المستندات الثلاثة بأمان عبر Netlify.
+      // ضغط كل صورة إلى حجم مناسب حتى تُرفع المستندات الثلاثة بأمان.
       const result = await compressImage(file, 0.75, 1200);
       setDocuments((prev) => ({
         ...prev,
