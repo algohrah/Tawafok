@@ -15,6 +15,9 @@ import {
   JOURNEY_STAGES, STAGE_INDEX, STAGE_META, ACCENT_CLASSES, legacyToJourney,
   isTerminal, type JourneyState,
 } from '../../lib/journey';
+
+// v2 stages للعرض (متوافق مع القديم والجديد)
+const ALL_JOURNEY_STAGES_V2 = ['sent', 'accepted', 'coordinating', 'closed'] as const;
 import Modal from '../../components/ui/Modal';
 import FilterDropdown from '../../components/admin/FilterDropdown';
 import ActionMenu from '../../components/admin/ActionMenu';
@@ -27,7 +30,7 @@ function stageTitle(s: string): string {
 }
 
 const ALL_STATES: (JourneyState | 'all')[] = [
-  'all', 'sent', 'accepted', 'seriousness', 'coordination', 'sharia_viewing', 'engagement', 'completed', 'declined', 'cancelled',
+  'all', 'sent', 'accepted', 'coordinating', 'closed', 'seriousness', 'coordination', 'sharia_viewing', 'engagement', 'completed', 'declined', 'cancelled',
 ];
 
 function stageOf(stage: string): JourneyState {
@@ -105,7 +108,8 @@ const tabs = [
 export default function AdminRequests() {
   const { requests, loading, error, actionLoading, setStage, updateCoordination, getMember, fetchEvents, fetchPayments, deleteRequest,
     moveToStage, delayStage, freezeRequest, unfreezeRequest, reactivateRequest, swapParty, members: adminMembers,
-    adminSetPayments, adminSetPledges, adminSetViewingResults, adminSetContacts } =
+    adminSetPayments, adminSetPledges, adminSetViewingResults, adminSetContacts,
+    adminConfirmDeposit, adminSetFinalFeeDue, adminConfirmFinalFee, adminCloseJourney } =
     useAdminRequests();
   const { interestRequests, adminModeratePreExchangeMessage, members, showToast, impersonateUser, currentAdminName } = useApp();
   const { markReviewed: markMsgReviewed, getMark: getMsgMark } = useReviewMarkers('twafok_moderated_messages');
@@ -180,6 +184,25 @@ export default function AdminRequests() {
   const [guardianPhone, setGuardianPhone] = useState('');
   const [guardianName, setGuardianName] = useState('');
   const [contactInfo, setContactInfo] = useState('');
+
+  // ===== States جديدة v2 =====
+  const [depositFor, setDepositFor] = useState<{ id: string | number; sender_id?: string; receiver_id?: string; sender_deposit_status?: string; receiver_deposit_status?: string } | null>(null);
+  const [depositSide, setDepositSide] = useState<'sender' | 'receiver'>('sender');
+  const [depositAmount, setDepositAmount] = useState<number>(500);
+  const [depositExempt, setDepositExempt] = useState(false);
+
+  const [finalFeeFor, setFinalFeeFor] = useState<{ id: string | number; sender_id?: string; receiver_id?: string } | null>(null);
+  const [finalFeeSide, setFinalFeeSide] = useState<'sender' | 'receiver'>('sender');
+  const [finalFeeAmount, setFinalFeeAmount] = useState<number>(2000);
+  const [finalFeeExempt, setFinalFeeExempt] = useState(false);
+  const [finalFeeNote, setFinalFeeNote] = useState('');
+
+  const [setFinalDueFor, setSetFinalDueFor] = useState<{ id: string | number } | null>(null);
+  const [setFinalDueNote, setSetFinalDueNote] = useState('');
+
+  const [closeJourneyFor, setCloseJourneyFor] = useState<{ id: string | number; sender_id?: string; receiver_id?: string } | null>(null);
+  const [closeReason, setCloseReason] = useState<string>('admin_closed');
+  const [closeNote, setCloseNote] = useState('');
 
   const handleAcceptRequest = async (req: { id: string | number }) => {
     const ok = await setStage(req.id, 'accepted', 'قبول وتفعيل إداري للطلب');
@@ -868,6 +891,46 @@ export default function AdminRequests() {
                             },
                           },
 
+                          // القسم 3.5: إجراءات v2 الجديدة
+                          { sectionHeader: '💳 إجراءات الرسوم (v2)', label: '', icon: <></>, onClick: () => {} },
+                          {
+                            label: 'تأكيد سداد العربون (500 ريال)',
+                            icon: <ShieldCheck className="w-4 h-4 text-emerald-500" />,
+                            onClick: () => {
+                              setDepositFor(req);
+                              setDepositSide('sender');
+                              setDepositAmount(500);
+                              setDepositExempt(false);
+                            },
+                          },
+                          {
+                            label: 'تسجيل استحقاق رسوم الخاتمة (2000 ريال)',
+                            icon: <CreditCard className="w-4 h-4 text-amber-600" />,
+                            onClick: () => {
+                              setSetFinalDueFor(req);
+                              setSetFinalDueNote('');
+                            },
+                          },
+                          {
+                            label: 'تأكيد سداد رسوم الخاتمة',
+                            icon: <CheckCircle2 className="w-4 h-4 text-blue-500" />,
+                            onClick: () => {
+                              setFinalFeeFor(req);
+                              setFinalFeeSide('sender');
+                              setFinalFeeAmount(2000);
+                              setFinalFeeExempt(false);
+                              setFinalFeeNote('');
+                            },
+                          },
+                          {
+                            label: 'إغلاق الرحلة (مع سبب)',
+                            icon: <XCircle className="w-4 h-4 text-rose-500" />,
+                            onClick: () => {
+                              setCloseJourneyFor(req);
+                              setCloseReason('admin_closed');
+                              setCloseNote('');
+                            },
+                          },
                           // القسم 3: تعديل البيانات والسجلات
                           { sectionHeader: '📝 تعديل البيانات والسجلات', label: '', icon: <></>, onClick: () => {} },
                           {
@@ -1943,6 +2006,198 @@ export default function AdminRequests() {
               className="w-full bg-sky-600 text-white font-cairo font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-sky-700 transition-colors"
             >
               <Check className="w-4 h-4" /> حفظ بيانات التواصل
+            </button>
+          </div>
+        )}
+      </Modal>
+
+      {/* ===== نافذة v2: تأكيد سداد العربون (500 ريال) ===== */}
+      <Modal open={!!depositFor} onClose={() => setDepositFor(null)} title="تأكيد سداد العربون (500 ريال)">
+        {depositFor && (
+          <div className="space-y-4 font-cairo">
+            <p className="text-sm text-slate-600">حدد الطرف والمبلغ الفعلي المدفوع لتأكيد السداد وقيده في السجل.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDepositSide('sender')}
+                className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-colors ${depositSide === 'sender' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-700 border-slate-200'}`}
+              >
+                المرسِل
+              </button>
+              <button
+                onClick={() => setDepositSide('receiver')}
+                className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-colors ${depositSide === 'receiver' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-700 border-slate-200'}`}
+              >
+                المستقبِل
+              </button>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">المبلغ المدفوع (ريال)</label>
+              <input
+                type="number"
+                value={depositAmount}
+                onChange={(e) => setDepositAmount(Number(e.target.value))}
+                disabled={depositExempt}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:opacity-50"
+              />
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={depositExempt} onChange={(e) => setDepositExempt(e.target.checked)} className="w-4 h-4 accent-amber-500" />
+              <span className="text-sm text-slate-700">إعفاء من العربون (قرار إداري)</span>
+            </label>
+            <button
+              onClick={async () => {
+                const ok = await adminConfirmDeposit(Number(depositFor.id), depositSide, depositAmount, depositExempt);
+                if (ok) {
+                  showLocalToast(`تم تأكيد ${depositExempt ? 'إعفاء' : 'سداد'} العربون للـ${depositSide === 'sender' ? 'مرسِل' : 'مستقبِل'} ✓`);
+                  setDepositFor(null);
+                }
+              }}
+              className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-700 transition-colors"
+            >
+              <Check className="w-4 h-4" /> تأكيد السداد
+            </button>
+          </div>
+        )}
+      </Modal>
+
+      {/* ===== نافذة v2: تسجيل استحقاق رسوم الخاتمة ===== */}
+      <Modal open={!!setFinalDueFor} onClose={() => setSetFinalDueFor(null)} title="تسجيل استحقاق رسوم الخاتمة (2000 ريال)">
+        {setFinalDueFor && (
+          <div className="space-y-4 font-cairo">
+            <p className="text-sm text-slate-600">يُسجَّل استحقاق رسوم الخاتمة (2000 ريال لكل طرف) بعد التأكد من تسليم المهر.</p>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">ملاحظة (اختياري)</label>
+              <input
+                type="text"
+                value={setFinalDueNote}
+                onChange={(e) => setSetFinalDueNote(e.target.value)}
+                placeholder="مثال: تم تسليم المهر بتاريخ..."
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+              />
+            </div>
+            <button
+              onClick={async () => {
+                const ok = await adminSetFinalFeeDue(Number(setFinalDueFor.id), setFinalDueNote);
+                if (ok) {
+                  showLocalToast('تم تسجيل استحقاق رسوم الخاتمة للطرفين ✓');
+                  setSetFinalDueFor(null);
+                }
+              }}
+              className="w-full bg-amber-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-700 transition-colors"
+            >
+              <Check className="w-4 h-4" /> تسجيل الاستحقاق
+            </button>
+          </div>
+        )}
+      </Modal>
+
+      {/* ===== نافذة v2: تأكيد سداد رسوم الخاتمة ===== */}
+      <Modal open={!!finalFeeFor} onClose={() => setFinalFeeFor(null)} title="تأكيد سداد رسوم الخاتمة (2000 ريال)">
+        {finalFeeFor && (
+          <div className="space-y-4 font-cairo">
+            <p className="text-sm text-slate-600">حدد الطرف والمبلغ الفعلي المدفوع من رسوم الخاتمة.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setFinalFeeSide('sender')}
+                className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-colors ${finalFeeSide === 'sender' ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-slate-700 border-slate-200'}`}
+              >
+                المرسِل
+              </button>
+              <button
+                onClick={() => setFinalFeeSide('receiver')}
+                className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-colors ${finalFeeSide === 'receiver' ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-slate-700 border-slate-200'}`}
+              >
+                المستقبِل
+              </button>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">المبلغ المدفوع (ريال)</label>
+              <input
+                type="number"
+                value={finalFeeAmount}
+                onChange={(e) => setFinalFeeAmount(Number(e.target.value))}
+                disabled={finalFeeExempt}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-50"
+              />
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={finalFeeExempt} onChange={(e) => setFinalFeeExempt(e.target.checked)} className="w-4 h-4 accent-amber-500" />
+              <span className="text-sm text-slate-700">إعفاء من رسوم الخاتمة (قرار إداري)</span>
+            </label>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">ملاحظة</label>
+              <input
+                type="text"
+                value={finalFeeNote}
+                onChange={(e) => setFinalFeeNote(e.target.value)}
+                placeholder="اختياري..."
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+              />
+            </div>
+            <button
+              onClick={async () => {
+                const ok = await adminConfirmFinalFee(Number(finalFeeFor.id), finalFeeSide, finalFeeAmount, finalFeeExempt);
+                if (ok) {
+                  showLocalToast(`تم تأكيد ${finalFeeExempt ? 'إعفاء' : 'سداد'} رسوم الخاتمة للـ${finalFeeSide === 'sender' ? 'مرسِل' : 'مستقبِل'} ✓`);
+                  setFinalFeeFor(null);
+                }
+              }}
+              className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors"
+            >
+              <Check className="w-4 h-4" /> تأكيد السداد
+            </button>
+          </div>
+        )}
+      </Modal>
+
+      {/* ===== نافذة v2: إغلاق الرحلة ===== */}
+      <Modal open={!!closeJourneyFor} onClose={() => setCloseJourneyFor(null)} title="إغلاق الرحلة">
+        {closeJourneyFor && (
+          <div className="space-y-4 font-cairo">
+            <p className="text-sm text-slate-600">اختر سبب إغلاق الرحلة. سيُسجَّل في التاريخ ويُرسَل إشعار للطرفين.</p>
+            <div className="space-y-2">
+              {[
+                { value: 'match', label: '🎉 تم الزواج بفضل الله' },
+                { value: 'no_match', label: 'لم يكتب النصيب' },
+                { value: 'withdrawn_sender', label: 'انسحب المرسِل' },
+                { value: 'withdrawn_receiver', label: 'انسحب المستقبِل' },
+                { value: 'timeout', label: 'انتهت المهلة' },
+                { value: 'admin_closed', label: 'إغلاق إداري' },
+              ].map((opt) => (
+                <label key={opt.value} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                  <input
+                    type="radio"
+                    name="closeReason"
+                    value={opt.value}
+                    checked={closeReason === opt.value}
+                    onChange={() => setCloseReason(opt.value)}
+                    className="w-4 h-4 accent-rose-500"
+                  />
+                  <span className="text-sm font-bold text-slate-800">{opt.label}</span>
+                </label>
+              ))}
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">ملاحظة إضافية</label>
+              <input
+                type="text"
+                value={closeNote}
+                onChange={(e) => setCloseNote(e.target.value)}
+                placeholder="اختياري..."
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
+              />
+            </div>
+            <button
+              onClick={async () => {
+                const ok = await adminCloseJourney(Number(closeJourneyFor.id), closeReason, closeNote);
+                if (ok) {
+                  showLocalToast('تم إغلاق الرحلة بنجاح ✓');
+                  setCloseJourneyFor(null);
+                }
+              }}
+              className="w-full bg-rose-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-rose-700 transition-colors"
+            >
+              <Check className="w-4 h-4" /> تأكيد الإغلاق
             </button>
           </div>
         )}
