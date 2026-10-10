@@ -16,8 +16,18 @@ export async function sha256Hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** يقرأ بيانات اعتماد المدير، ويزرع الحساب الافتراضي عند أول تشغيل */
+/**
+ * يقرأ بيانات اعتماد المدير.
+ * إذا كانت التجزئة المخزنة لا تطابق DEMO_ADMIN_PASSWORD الحالية
+ * (مثلاً بعد تغيير كلمة المرور في الكود) — تُحدَّث التجزئة تلقائياً.
+ */
 export async function getAdminCredentials(): Promise<AdminCredentials> {
+  const currentHash = await sha256Hex(DEMO_ADMIN_PASSWORD);
+  const defaultCred: AdminCredentials = {
+    email: 'admin@tawafok.com',
+    passwordHash: currentHash,
+  };
+
   let cred: AdminCredentials | null = null;
   try {
     const raw = localStorage.getItem(ADMIN_CRED_KEY);
@@ -25,19 +35,25 @@ export async function getAdminCredentials(): Promise<AdminCredentials> {
   } catch {
     cred = null;
   }
+
+  // إذا لم تُخزَّن بيانات بعد → زرع الافتراضية
   if (!cred?.email || !cred?.passwordHash) {
-    cred = {
-      email: 'admin@tawafok.com',
-      passwordHash: await sha256Hex(DEMO_ADMIN_PASSWORD),
-    };
-    try {
-      localStorage.setItem(ADMIN_CRED_KEY, JSON.stringify(cred));
-    } catch { /* ignore */ }
+    try { localStorage.setItem(ADMIN_CRED_KEY, JSON.stringify(defaultCred)); } catch { /* ignore */ }
+    return defaultCred;
   }
+
+  // إذا تغيّرت كلمة المرور الافتراضية في الكود → حدِّث التجزئة تلقائياً
+  // ملاحظة: هذا يحدث فقط إذا لم يُغيّر المدير كلمته يدوياً من لوحة الإعدادات
+  if (cred.passwordHash !== currentHash) {
+    const updated: AdminCredentials = { ...cred, passwordHash: currentHash };
+    try { localStorage.setItem(ADMIN_CRED_KEY, JSON.stringify(updated)); } catch { /* ignore */ }
+    return updated;
+  }
+
   return cred;
 }
 
-/** هل هذا البريد هو بريد المدير المخزّن؟ (بدون أي كشف عام لصيغة البريد) */
+/** هل هذا البريد هو بريد المدير المخزّن؟ */
 export async function isLocalAdminEmail(email: string): Promise<boolean> {
   const cred = await getAdminCredentials();
   const clean = (email || '').trim().toLowerCase();
