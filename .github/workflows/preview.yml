@@ -27,15 +27,17 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps --no-audit --no-fund
 
-      - name: Patch base path to /Tawafok/preview/
+      - name: Patch vite.config.ts for /Tawafok/preview/ base
         run: |
-          sed -i "s#base:.*#base: '/Tawafok/preview/',#" vite.config.ts || true
-          grep base vite.config.ts
+          sed -i "s|base: isGitHubPages ? '/tawasul-marriage-platform/' : '/',|base: process.env.VITE_BASE_PATH || (isGitHubPages ? '/tawasul-marriage-platform/' : '/'),|" vite.config.ts
+          grep 'base:' vite.config.ts
 
       - name: Build preview
         run: npm run build
         env:
           VITE_DATABASE_PROVIDER: local
+          GITHUB_ACTIONS: 'true'
+          VITE_BASE_PATH: '/Tawafok/preview/'
 
       - name: Prepare static files
         run: |
@@ -43,7 +45,7 @@ jobs:
           cp dist/index.html dist/404.html
           touch dist/.nojekyll
 
-      - name: Checkout gh-pages and deploy preview/
+      - name: Deploy to gh-pages preview/
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
