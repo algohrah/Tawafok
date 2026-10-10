@@ -27,17 +27,16 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps --no-audit --no-fund
 
-      - name: Patch vite.config.ts for /Tawafok/preview/ base
+      - name: Patch vite.config.ts for preview base path
         run: |
-          sed -i "s|base: isGitHubPages ? '/tawasul-marriage-platform/' : '/',|base: process.env.VITE_BASE_PATH || (isGitHubPages ? '/tawasul-marriage-platform/' : '/'),|" vite.config.ts
-          grep 'base:' vite.config.ts
+          sed -i "s|'/tawasul-marriage-platform/'|'/Tawafok/preview/'|g" vite.config.ts
+          grep 'base' vite.config.ts
 
       - name: Build preview
         run: npm run build
         env:
           VITE_DATABASE_PROVIDER: local
           GITHUB_ACTIONS: 'true'
-          VITE_BASE_PATH: '/Tawafok/preview/'
 
       - name: Prepare static files
         run: |
