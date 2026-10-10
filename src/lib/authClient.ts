@@ -2,7 +2,7 @@
 //  عميل المصادقة المحلي — بديل عميل قاعدة البيانات المحلية بالكامل
 //  يعمل بقاعدة البيانات المحلية (SQLite) دون أي خدمة خارجية:
 //  - الجلسات تُخزَّن محليًا في المتصفح
-//  - المصادقة تجريبية محلية: البريد + كلمة مرور من 6 أحرف على الأقل
+//  - المصادقة تتحقق من وجود العضو في قاعدة البيانات المحلية
 //  - مصادقة الإدارة تتم عبر التحقق من تجزئة كلمة المرور في adminAuth.ts
 // ====================================================================
 
@@ -30,7 +30,6 @@ function saveSession(session: LocalSession | null) {
 }
 
 function makeSession(email: string): LocalSession {
-  // نضمّن بريد المستخدم داخل التوكن المحلي لتمييز العضو عن المدير في الوضع المحلي
   let encoded = '';
   try {
     encoded = typeof btoa === 'function' ? btoa(encodeURIComponent(email || '')) : '';
@@ -38,7 +37,7 @@ function makeSession(email: string): LocalSession {
   return {
     access_token: `local-token-${encoded}-${Date.now()}`,
     refresh_token: `local-refresh-${encoded}-${Date.now()}`,
-    user: { id: email || 'local-user', email: email || 'demo@tawasul.sa' },
+    user: { id: email || 'local-user', email: email || 'user@tawafok.com' },
   };
 }
 
@@ -126,17 +125,44 @@ const authClient = {
       return { data: { subscription: { unsubscribe: () => window.removeEventListener('local-auth-changed', handler) } } };
     },
     signInWithPassword: async ({ email, password }: { email: string; password: string }) => {
+      // التحقق الأساسي من صحة البريد وطول كلمة المرور
       if (!email.includes('@') || password.length < 6) {
         return { data: { user: null, session: null }, error: new Error('بيانات الدخول غير صحيحة') };
       }
+      // البحث عن العضو في قاعدة البيانات المحلية
+      try {
+        const savedMembers = JSON.parse(localStorage.getItem('saved_members_list') || '[]');
+        const cleanEmail = email.trim().toLowerCase();
+        const member = Array.isArray(savedMembers)
+          ? savedMembers.find((m: any) => m.email?.toLowerCase().trim() === cleanEmail)
+          : null;
+        if (!member) {
+          return { data: { user: null, session: null }, error: new Error('لا يوجد حساب بهذا البريد الإلكتروني') };
+        }
+        // التحقق من كلمة المرور إذا كانت مخزنة
+        if (member.password && member.password !== password) {
+          return { data: { user: null, session: null }, error: new Error('كلمة المرور غير صحيحة') };
+        }
+      } catch { /* ignore storage errors */ }
       const session = makeSession(email);
       saveSession(session);
       return { data: { user: session.user, session }, error: null };
     },
     signUp: async ({ email, password }: { email: string; password: string }) => {
-      if (!email.includes('@') || password.length < 6) {
-        return { data: { user: null, session: null }, error: new Error('البريد أو كلمة المرور غير صحيحة') };
+      if (!email.includes('@') || password.length < 8) {
+        return { data: { user: null, session: null }, error: new Error('البريد أو كلمة المرور غير صحيحة. كلمة المرور يجب أن تكون 8 أحرف على الأقل') };
       }
+      // التحقق من عدم وجود حساب بنفس البريد
+      try {
+        const savedMembers = JSON.parse(localStorage.getItem('saved_members_list') || '[]');
+        const cleanEmail = email.trim().toLowerCase();
+        const existing = Array.isArray(savedMembers)
+          ? savedMembers.find((m: any) => m.email?.toLowerCase().trim() === cleanEmail)
+          : null;
+        if (existing) {
+          return { data: { user: null, session: null }, error: new Error('يوجد حساب مسجل بهذا البريد الإلكتروني مسبقاً') };
+        }
+      } catch { /* ignore */ }
       const session = makeSession(email);
       saveSession(session);
       return { data: { user: session.user, session }, error: null };
@@ -148,13 +174,13 @@ const authClient = {
       const session: LocalSession = {
         access_token: access_token || `local-token-${Date.now()}`,
         refresh_token: refresh_token || `local-refresh-${Date.now()}`,
-        user: { id: 'google-local-user', email: 'google.local@tawasul.sa' },
+        user: { id: 'google-local-user', email: 'google.local@tawafok.com' },
       };
       saveSession(session);
       return { data: { session }, error: null };
     },
     signInWithIdToken: async () => {
-      const session = makeSession('google.local@tawasul.sa');
+      const session = makeSession('google.local@tawafok.com');
       saveSession(session);
       return { data: { session }, error: null };
     },

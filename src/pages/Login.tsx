@@ -6,7 +6,6 @@ import { Button } from '../components/ui/Button';
 import { getAvatar } from '../lib/types';
 import { useApp } from '../lib/AppContext';
 import { verifyLocalAdmin, isLocalAdminEmail } from '../lib/adminAuth';
-import { DEMO_ADMIN_PASSWORD } from '../lib/constants';
 import authClient from '../lib/authClient';
 
 export default function Login() {
@@ -120,12 +119,21 @@ export default function Login() {
         return;
       }
 
-      // البحث عن العضو محلياً إذا لم يكن مرتبطاً بـ whoami
+      // البحث عن العضو في قاعدة البيانات المحلية
       if (typeof window !== 'undefined') {
         try {
           const savedMembers = JSON.parse(localStorage.getItem('saved_members_list') || '[]');
-          const localMember = Array.isArray(savedMembers) ? savedMembers.find((m: any) => m.email?.toLowerCase().trim() === cleanEmail || m.id === cleanEmail) : null;
+          const localMember = Array.isArray(savedMembers)
+            ? savedMembers.find((m: any) => m.email?.toLowerCase().trim() === cleanEmail)
+            : null;
+
           if (localMember) {
+            // التحقق من كلمة المرور إذا كانت مخزنة
+            if (localMember.password && localMember.password !== password) {
+              setError('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
+              setLoading(false);
+              return;
+            }
             loginWithSession(localMember, cleanEmail);
             navigate(from);
             return;
@@ -133,19 +141,8 @@ export default function Login() {
         } catch { /* ignore */ }
       }
 
-      // إنشاء جلسة دخول افتراضية للعضو
-      loginWithSession({
-        id: `user-${Date.now()}`,
-        nickname: cleanEmail.split('@')[0] || 'عضو جديد',
-        email: cleanEmail,
-        gender: 'male',
-        maritalStatus: 'single',
-        country: 'السعودية',
-        city: 'الرياض',
-        plan: 'free',
-        verified: false,
-      } as any, cleanEmail);
-      navigate(from);
+      // إذا لم يُعثر على العضو في قاعدة البيانات
+      setError('لا يوجد حساب بهذا البريد الإلكتروني. يرجى التسجيل أولاً.');
     } catch (err: any) {
       setError(err?.message || 'حدث خطأ غير متوقع، حاول مرة أخرى');
     } finally {
@@ -185,29 +182,6 @@ export default function Login() {
 
           <h1 className="font-cairo font-extrabold text-xl sm:text-3xl text-navy-900">تسجيل الدخول</h1>
           <p className="mt-2 text-navy-600 font-tajawal text-sm sm:text-base">أدخل بياناتك للوصول إلى حسابك</p>
-
-          {/* بطاقة تجربة لوحة الإدارة للمستخدم */}
-          <div className="mt-4 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-navy-900">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-              <div>
-                <span className="font-cairo font-bold text-xs text-amber-800 bg-amber-200/70 px-2 py-0.5 rounded-md inline-block mb-1">
-                  💡 بيانات اختبار لوحة الإدارة
-                </span>
-                <p className="text-xs font-mono font-medium text-navy-800">البريد: <span className="font-bold text-amber-900 select-all">admin@tawafok.com</span></p>
-                <p className="text-xs font-mono font-medium text-navy-800">كلمة المرور: <span className="font-bold text-amber-900 select-all">{DEMO_ADMIN_PASSWORD}</span></p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('admin@tawafok.com');
-                  setPassword(DEMO_ADMIN_PASSWORD);
-                }}
-                className="w-full sm:w-auto mt-2 sm:mt-0 px-3 py-1.5 rounded-xl bg-gold-500 text-slate-900 font-cairo font-bold text-xs hover:bg-gold-600 transition-colors shadow-sm flex-shrink-0"
-              >
-                تعبئة تلقائية
-              </button>
-            </div>
-          </div>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-5">
             {error && (
