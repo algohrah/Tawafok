@@ -1,12 +1,8 @@
 // ====================================================================
 //  عميل المصادقة المحلي — بديل عميل قاعدة البيانات المحلية بالكامل
-//  يعمل بقاعدة البيانات المحلية (SQLite) دون أي خدمة خارجية:
-//  - الجلسات تُخزَّن محليًا في المتصفح
-//  - المصادقة تتحقق من وجود العضو في قاعدة البيانات المحلية
-//  - مصادقة الإدارة تتم عبر adminAuth.ts (مسار مستقل)
+//  ملاحظة: مصادقة الإدارة تتم بشكل مستقل في Login.tsx عبر verifyLocalAdmin
+//  هذا الملف يتعامل فقط مع الأعضاء العاديين
 // ====================================================================
-
-import { isLocalAdminEmail } from './adminAuth';
 
 type LocalSession = {
   access_token: string;
@@ -33,9 +29,7 @@ function saveSession(session: LocalSession | null) {
 
 function makeSession(email: string): LocalSession {
   let encoded = '';
-  try {
-    encoded = typeof btoa === 'function' ? btoa(encodeURIComponent(email || '')) : '';
-  } catch { encoded = ''; }
+  try { encoded = typeof btoa === 'function' ? btoa(encodeURIComponent(email || '')) : ''; } catch { encoded = ''; }
   return {
     access_token: `local-token-${encoded}-${Date.now()}`,
     refresh_token: `local-refresh-${encoded}-${Date.now()}`,
@@ -44,76 +38,35 @@ function makeSession(email: string): LocalSession {
 }
 
 const createDummyChannel = () => {
-  const dummy = {
-    on: () => dummy,
-    subscribe: () => dummy,
-    unsubscribe: () => dummy,
-  };
+  const dummy = { on: () => dummy, subscribe: () => dummy, unsubscribe: () => dummy };
   return dummy;
 };
 
 const createDummyQuery = () => {
   let lastPayload: any = null;
   const dummy: any = {
-    select: () => dummy,
-    insert: (val: any) => { lastPayload = val; return dummy; },
-    upsert: (val: any) => { lastPayload = val; return dummy; },
-    update: (val: any) => { lastPayload = val; return dummy; },
-    delete: () => dummy,
-    eq: () => dummy,
-    neq: () => dummy,
-    gt: () => dummy,
-    gte: () => dummy,
-    lt: () => dummy,
-    lte: () => dummy,
-    like: () => dummy,
-    ilike: () => dummy,
-    is: () => dummy,
-    in: () => dummy,
-    contains: () => dummy,
-    containedBy: () => dummy,
-    range: () => dummy,
-    textSearch: () => dummy,
-    match: () => dummy,
-    not: () => dummy,
-    or: () => dummy,
-    filter: () => dummy,
-    order: () => dummy,
-    limit: () => dummy,
-    offset: () => dummy,
-    csv: () => dummy,
-    returns: () => dummy,
-    rollback: async () => ({
-      data: Array.isArray(lastPayload) ? (lastPayload[0] || {}) : (lastPayload || {}),
-      error: null,
-    }),
-    single: async () => ({
-      data: Array.isArray(lastPayload) ? (lastPayload[0] || {}) : (lastPayload || {}),
-      error: null,
-    }),
-    maybeSingle: async () => ({
-      data: Array.isArray(lastPayload) ? (lastPayload[0] || null) : (lastPayload || null),
-      error: null,
-    }),
+    select: () => dummy, insert: (v: any) => { lastPayload = v; return dummy; },
+    upsert: (v: any) => { lastPayload = v; return dummy; }, update: (v: any) => { lastPayload = v; return dummy; },
+    delete: () => dummy, eq: () => dummy, neq: () => dummy, gt: () => dummy, gte: () => dummy,
+    lt: () => dummy, lte: () => dummy, like: () => dummy, ilike: () => dummy, is: () => dummy,
+    in: () => dummy, contains: () => dummy, containedBy: () => dummy, range: () => dummy,
+    textSearch: () => dummy, match: () => dummy, not: () => dummy, or: () => dummy,
+    filter: () => dummy, order: () => dummy, limit: () => dummy, offset: () => dummy,
+    csv: () => dummy, returns: () => dummy,
+    rollback: async () => ({ data: Array.isArray(lastPayload) ? (lastPayload[0] || {}) : (lastPayload || {}), error: null }),
+    single: async () => ({ data: Array.isArray(lastPayload) ? (lastPayload[0] || {}) : (lastPayload || {}), error: null }),
+    maybeSingle: async () => ({ data: Array.isArray(lastPayload) ? (lastPayload[0] || null) : (lastPayload || null), error: null }),
     then: (resolve: any, reject: any) => {
-      const resultData = Array.isArray(lastPayload)
-        ? lastPayload
-        : lastPayload
-        ? [lastPayload]
-        : [];
+      const resultData = Array.isArray(lastPayload) ? lastPayload : lastPayload ? [lastPayload] : [];
       return Promise.resolve({ data: resultData, error: null }).then(resolve, reject);
     },
     catch: (reject: any) => Promise.resolve({ data: [], error: null }).catch(reject),
   };
-
   return new Proxy(dummy, {
     get(target, prop) {
       if (prop in target) return target[prop];
       if (typeof prop === 'symbol' || prop === 'inspect' || prop === 'valueOf' || prop === 'toString') return undefined;
-      return (arg: any) => {
-        if (arg !== undefined) lastPayload = arg;
-        return target;
-      };
+      return (arg: any) => { if (arg !== undefined) lastPayload = arg; return target; };
     },
   });
 };
@@ -130,20 +83,8 @@ const authClient = {
       if (!email.includes('@') || password.length < 6) {
         return { data: { user: null, session: null }, error: new Error('بيانات الدخول غير صحيحة') };
       }
-
       const cleanEmail = email.trim().toLowerCase();
-
-      // بريد المدير: يتجاوز التحقق من saved_members_list
-      // لأن مصادقته تتم بشكل منفصل عبر verifyLocalAdmin في Login.tsx
-      try {
-        const adminMatch = await isLocalAdminEmail(cleanEmail);
-        if (adminMatch) {
-          // أعدّ خطأً كي يستمر Login.tsx في مسار verifyLocalAdmin
-          return { data: { user: null, session: null }, error: new Error('يجب التحقق من كلمة مرور المدير') };
-        }
-      } catch { /* ignore */ }
-
-      // البحث عن العضو في قاعدة البيانات المحلية
+      // البحث عن العضو في قائمة الأعضاء فقط (ليس المدير — مساره في Login.tsx)
       try {
         const savedMembers = JSON.parse(localStorage.getItem('saved_members_list') || '[]');
         const member = Array.isArray(savedMembers)
@@ -155,8 +96,7 @@ const authClient = {
         if (member.password && member.password !== password) {
           return { data: { user: null, session: null }, error: new Error('كلمة المرور غير صحيحة') };
         }
-      } catch { /* ignore storage errors */ }
-
+      } catch { /* ignore */ }
       const session = makeSession(email);
       saveSession(session);
       return { data: { user: session.user, session }, error: null };
