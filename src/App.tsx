@@ -14,6 +14,7 @@ const routeLoaders = {
   MemberProfile: () => import('./pages/MemberProfile'),
   Register: () => import('./pages/Register'),
   Login: () => import('./pages/Login'),
+  AdminLogin: () => import('./pages/AdminLogin'),
   ForgotPassword: () => import('./pages/ForgotPassword'),
   ResetPassword: () => import('./pages/ResetPassword'),
   About: () => import('./pages/About'),
@@ -57,9 +58,6 @@ const routeLoaders = {
 type RouteLoader = () => Promise<any>;
 type PreloadableLazy = ReturnType<typeof lazy> & { preload: RouteLoader };
 
-// يلفّ مُحمّل الوحدة بآلية استرجاع تلقائي: عند فشل جلب chunk (غالباً لأن النشر
-// حدّث أسماء الملفات وبقيت نسخة index.html القديمة في المتصفح) نُعيد تحميل الصفحة
-// مرة واحدة لجلب النسخة الجديدة، مع علامة في sessionStorage لمنع أي حلقة لانهائية.
 function makeReloadableLoader(loader: RouteLoader): RouteLoader {
   return async () => {
     try {
@@ -71,11 +69,9 @@ function makeReloadableLoader(loader: RouteLoader): RouteLoader {
       if (isChunkError && typeof window !== 'undefined') {
         const KEY = 'chunk_reload_ts';
         const last = Number(sessionStorage.getItem(KEY) || '0');
-        // نعيد التحميل مرة واحدة كل 10 ثوانٍ كحد أقصى لتفادي التكرار اللانهائي
         if (Date.now() - last > 10000) {
           sessionStorage.setItem(KEY, String(Date.now()));
           window.location.reload();
-          // نُرجع Promise لا يُحل حتى تكتمل إعادة التحميل
           return new Promise(() => {});
         }
       }
@@ -93,8 +89,6 @@ function lazyWithPreload(loader: RouteLoader): PreloadableLazy {
 
 const Layout = lazyWithPreload(routeLoaders.Layout);
 const AdminLayout = lazyWithPreload(routeLoaders.AdminLayout);
-
-// Public/User pages
 const Home = lazyWithPreload(routeLoaders.Home);
 const Search = lazyWithPreload(routeLoaders.Search);
 const Profile = lazyWithPreload(routeLoaders.Profile);
@@ -103,6 +97,7 @@ const CompleteProfile = lazyWithPreload(routeLoaders.CompleteProfile);
 const MemberProfile = lazyWithPreload(routeLoaders.MemberProfile);
 const Register = lazyWithPreload(routeLoaders.Register);
 const Login = lazyWithPreload(routeLoaders.Login);
+const AdminLogin = lazyWithPreload(routeLoaders.AdminLogin);
 const ForgotPassword = lazyWithPreload(routeLoaders.ForgotPassword);
 const ResetPassword = lazyWithPreload(routeLoaders.ResetPassword);
 const About = lazyWithPreload(routeLoaders.About);
@@ -115,8 +110,6 @@ const InterestRequests = lazyWithPreload(routeLoaders.InterestRequests);
 const AdminChat = lazyWithPreload(routeLoaders.AdminChat);
 const LegalPage = lazyWithPreload(routeLoaders.LegalPage);
 const NotFound = lazyWithPreload(routeLoaders.NotFound);
-
-// Admin pages
 const AdminDashboard = lazyWithPreload(routeLoaders.AdminDashboard);
 const AdminMembers = lazyWithPreload(routeLoaders.AdminMembers);
 const AdminRequests = lazyWithPreload(routeLoaders.AdminRequests);
@@ -145,13 +138,10 @@ const AdminTrustHub = lazyWithPreload(routeLoaders.AdminTrustHub);
 const AdminSettingsHub = lazyWithPreload(routeLoaders.AdminSettingsHub);
 
 const preloadedRoutes = new Set<string>();
-
 function preloadRoute(pathname: string) {
   const path = (pathname.replace(/\/+$/, '') || '/').toLowerCase();
   const jobs: Array<[string, RouteLoader]> = [];
-
   const add = (key: keyof typeof routeLoaders) => jobs.push([key, routeLoaders[key]]);
-
   if (path.startsWith('/admin')) {
     add('AdminLayout');
     if (path === '/admin') add('AdminDashboard');
@@ -183,6 +173,7 @@ function preloadRoute(pathname: string) {
     else if (path.startsWith('/member/') || path.startsWith('/u/')) add('MemberProfile');
     else if (path.startsWith('/register')) add('Register');
     else if (path.startsWith('/login')) add('Login');
+    else if (path.startsWith('/admin-login')) add('AdminLogin');
     else if (path.startsWith('/forgot-password')) add('ForgotPassword');
     else if (path.startsWith('/reset-password')) add('ResetPassword');
     else if (path.startsWith('/about')) add('About');
@@ -195,7 +186,6 @@ function preloadRoute(pathname: string) {
     else if (path.startsWith('/admin-chat')) add('AdminChat');
     else if (path.startsWith('/legal/')) add('LegalPage');
   }
-
   jobs.forEach(([key, loader]) => {
     if (preloadedRoutes.has(key)) return;
     preloadedRoutes.add(key);
@@ -213,7 +203,6 @@ function RoutePrefetcher() {
       if (url.origin !== window.location.origin) return;
       preloadRoute(url.pathname);
     };
-
     const preloadVisibleLinks = () => {
       document.querySelectorAll<HTMLAnchorElement>('a[href^="/"]').forEach((anchor) => {
         const rect = anchor.getBoundingClientRect();
@@ -221,30 +210,19 @@ function RoutePrefetcher() {
         if (nearViewport) preloadRoute(new URL(anchor.href, window.location.href).pathname);
       });
     };
-
     const onPointer = (event: Event) => preloadAnchor(event.target);
     const onFocus = (event: Event) => preloadAnchor(event.target);
-
     document.addEventListener('pointerover', onPointer, { passive: true });
     document.addEventListener('pointerdown', onPointer, { passive: true });
     document.addEventListener('touchstart', onPointer, { passive: true });
     document.addEventListener('focusin', onFocus);
-
     const scheduleIdle = window.requestIdleCallback || ((cb: any) => window.setTimeout(cb, 700));
     const cancelIdle = window.cancelIdleCallback || window.clearTimeout;
     const idleId = scheduleIdle(() => {
       preloadVisibleLinks();
-      const likelyNext = window.location.pathname.startsWith('/admin')
-        ? ['/admin', '/admin/members', '/admin/requests', '/admin/import-members']
-        : ['/search', '/member/prefetch', '/requests', '/profile', '/plans'];
-      likelyNext.forEach(preloadRoute);
     }, { timeout: 1800 });
-
-    const onScroll = () => {
-      window.requestAnimationFrame(preloadVisibleLinks);
-    };
+    const onScroll = () => { window.requestAnimationFrame(preloadVisibleLinks); };
     window.addEventListener('scroll', onScroll, { passive: true });
-
     return () => {
       document.removeEventListener('pointerover', onPointer);
       document.removeEventListener('pointerdown', onPointer);
@@ -254,16 +232,15 @@ function RoutePrefetcher() {
       cancelIdle(idleId as any);
     };
   }, []);
-
   return null;
 }
 
 function PageLoader() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-cream-50 dark:bg-navy-950 text-emerald-600 p-4" dir="rtl">
+    <div className="min-h-screen flex items-center justify-center bg-cream-50 text-emerald-600 p-4" dir="rtl">
       <div className="flex flex-col items-center gap-3">
         <div className="w-10 h-10 border-4 border-emerald-500/30 border-t-emerald-600 rounded-full animate-spin"></div>
-        <span className="text-sm font-medium font-tajawal text-slate-700 dark:text-slate-300">جاري تحضير المنصة...</span>
+        <span className="text-sm font-medium font-tajawal text-slate-700">جاري تحضير المنصة...</span>
       </div>
     </div>
   );
@@ -277,6 +254,9 @@ export default function App() {
           <RoutePrefetcher />
           <Suspense fallback={<PageLoader />}>
             <Routes>
+              {/* صفحة تسجيل دخول الإدارة المستقلة — خارج أي Layout */}
+              <Route path="/admin-login" element={<AdminLogin />} />
+
               {/* User facing layout */}
               <Route path="/" element={<Layout />}>
                 <Route index element={<Home />} />
@@ -299,7 +279,6 @@ export default function App() {
                 <Route path="notifications" element={<Notifications />} />
                 <Route path="requests" element={<InterestRequests />} />
                 <Route path="admin-chat" element={<AdminChat />} />
-                {/* روابط مختصرة/قديمة — تحويلات لتفادي صفحة 404 */}
                 <Route path="support" element={<Navigate to="/admin-chat" replace />} />
                 <Route path="terms" element={<Navigate to="/legal/terms" replace />} />
                 <Route path="privacy" element={<Navigate to="/legal/privacy" replace />} />
@@ -313,28 +292,23 @@ export default function App() {
                 <Route index element={<AdminOverviewHub />} />
                 <Route path="overview" element={<AdminOverviewHub />} />
                 <Route path="analytics" element={<Navigate to="/admin/overview?tab=analytics" replace />} />
-                
                 <Route path="members" element={<AdminMembersHub />} />
                 <Route path="members-hub" element={<AdminMembersHub />} />
                 <Route path="khataaba-directory" element={<Navigate to="/admin/members?tab=khataaba" replace />} />
                 <Route path="import-members" element={<Navigate to="/admin/members?tab=import" replace />} />
                 <Route path="verifications" element={<Navigate to="/admin/members?tab=verifications" replace />} />
-                
                 <Route path="journeys" element={<AdminJourneysHub />} />
                 <Route path="requests" element={<Navigate to="/admin/journeys?tab=requests" replace />} />
                 <Route path="imported-coordination" element={<Navigate to="/admin/journeys?tab=imported" replace />} />
-                
                 <Route path="finance" element={<AdminFinanceHub />} />
                 <Route path="transactions" element={<Navigate to="/admin/finance?tab=transactions" replace />} />
                 <Route path="plans" element={<Navigate to="/admin/finance?tab=plans" replace />} />
                 <Route path="exemptions" element={<Navigate to="/admin/finance?tab=exemptions" replace />} />
-                
                 <Route path="trust" element={<AdminTrustHub />} />
                 <Route path="support" element={<Navigate to="/admin/trust?tab=messages" replace />} />
                 <Route path="messages" element={<Navigate to="/admin/trust?tab=messages" replace />} />
                 <Route path="reports" element={<Navigate to="/admin/trust?tab=reports" replace />} />
                 <Route path="audit-log" element={<Navigate to="/admin/trust?tab=audit" replace />} />
-                
                 <Route path="settings" element={<AdminSettingsHub />} />
                 <Route path="backup" element={<Navigate to="/admin/settings?tab=backup" replace />} />
                 <Route path="settings/backup" element={<Navigate to="/admin/settings?tab=backup" replace />} />
