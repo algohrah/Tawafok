@@ -3,8 +3,10 @@
 //  يعمل بقاعدة البيانات المحلية (SQLite) دون أي خدمة خارجية:
 //  - الجلسات تُخزَّن محليًا في المتصفح
 //  - المصادقة تتحقق من وجود العضو في قاعدة البيانات المحلية
-//  - مصادقة الإدارة تتم عبر التحقق من تجزئة كلمة المرور في adminAuth.ts
+//  - مصادقة الإدارة تتم عبر adminAuth.ts (مسار مستقل)
 // ====================================================================
+
+import { isLocalAdminEmail } from './adminAuth';
 
 type LocalSession = {
   access_token: string;
@@ -125,25 +127,36 @@ const authClient = {
       return { data: { subscription: { unsubscribe: () => window.removeEventListener('local-auth-changed', handler) } } };
     },
     signInWithPassword: async ({ email, password }: { email: string; password: string }) => {
-      // التحقق الأساسي من صحة البريد وطول كلمة المرور
       if (!email.includes('@') || password.length < 6) {
         return { data: { user: null, session: null }, error: new Error('بيانات الدخول غير صحيحة') };
       }
+
+      const cleanEmail = email.trim().toLowerCase();
+
+      // بريد المدير: يتجاوز التحقق من saved_members_list
+      // لأن مصادقته تتم بشكل منفصل عبر verifyLocalAdmin في Login.tsx
+      try {
+        const adminMatch = await isLocalAdminEmail(cleanEmail);
+        if (adminMatch) {
+          // أعدّ خطأً كي يستمر Login.tsx في مسار verifyLocalAdmin
+          return { data: { user: null, session: null }, error: new Error('يجب التحقق من كلمة مرور المدير') };
+        }
+      } catch { /* ignore */ }
+
       // البحث عن العضو في قاعدة البيانات المحلية
       try {
         const savedMembers = JSON.parse(localStorage.getItem('saved_members_list') || '[]');
-        const cleanEmail = email.trim().toLowerCase();
         const member = Array.isArray(savedMembers)
           ? savedMembers.find((m: any) => m.email?.toLowerCase().trim() === cleanEmail)
           : null;
         if (!member) {
           return { data: { user: null, session: null }, error: new Error('لا يوجد حساب بهذا البريد الإلكتروني') };
         }
-        // التحقق من كلمة المرور إذا كانت مخزنة
         if (member.password && member.password !== password) {
           return { data: { user: null, session: null }, error: new Error('كلمة المرور غير صحيحة') };
         }
       } catch { /* ignore storage errors */ }
+
       const session = makeSession(email);
       saveSession(session);
       return { data: { user: session.user, session }, error: null };
@@ -152,7 +165,6 @@ const authClient = {
       if (!email.includes('@') || password.length < 8) {
         return { data: { user: null, session: null }, error: new Error('البريد أو كلمة المرور غير صحيحة. كلمة المرور يجب أن تكون 8 أحرف على الأقل') };
       }
-      // التحقق من عدم وجود حساب بنفس البريد
       try {
         const savedMembers = JSON.parse(localStorage.getItem('saved_members_list') || '[]');
         const cleanEmail = email.trim().toLowerCase();
