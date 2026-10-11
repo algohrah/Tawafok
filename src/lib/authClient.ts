@@ -1,8 +1,10 @@
 // ====================================================================
 //  عميل المصادقة المحلي — بديل عميل قاعدة البيانات المحلية بالكامل
-//  ملاحظة: مصادقة الإدارة تتم بشكل مستقل في Login.tsx عبر verifyLocalAdmin
+//  ملاحظة: مصادقة الإدارة تتم بشكل مستقل في AdminLayout عبر verifyLocalAdmin
 //  هذا الملف يتعامل فقط مع الأعضاء العاديين
 // ====================================================================
+
+const ADMIN_EMAIL_LOCAL = 'admin@tawafok.com';
 
 type LocalSession = {
   access_token: string;
@@ -84,7 +86,15 @@ const authClient = {
         return { data: { user: null, session: null }, error: new Error('بيانات الدخول غير صحيحة') };
       }
       const cleanEmail = email.trim().toLowerCase();
-      // البحث عن العضو في قائمة الأعضاء فقط (ليس المدير — مساره في Login.tsx)
+
+      // السماح للمدير بالمرور مباشرة — التحقق من كلمة المرور تم مسبقاً في verifyLocalAdmin
+      if (cleanEmail === ADMIN_EMAIL_LOCAL) {
+        const session = makeSession(cleanEmail);
+        saveSession(session);
+        return { data: { user: session.user, session }, error: null };
+      }
+
+      // البحث عن العضو في قائمة الأعضاء فقط
       try {
         const savedMembers = JSON.parse(localStorage.getItem('saved_members_list') || '[]');
         const member = Array.isArray(savedMembers)
