@@ -173,7 +173,6 @@ function preloadRoute(pathname: string) {
     else if (path.startsWith('/member/') || path.startsWith('/u/')) add('MemberProfile');
     else if (path.startsWith('/register')) add('Register');
     else if (path.startsWith('/login')) add('Login');
-    else if (path.startsWith('/admin-login')) add('AdminLogin');
     else if (path.startsWith('/forgot-password')) add('ForgotPassword');
     else if (path.startsWith('/reset-password')) add('ResetPassword');
     else if (path.startsWith('/about')) add('About');
@@ -255,7 +254,7 @@ export default function App() {
           <Suspense fallback={<PageLoader />}>
             <Routes>
               {/* صفحة تسجيل دخول الإدارة المستقلة — خارج أي Layout */}
-              <Route path="/admin-login" element={<AdminLogin />} />
+              <Route path="/admin-login" element={<Navigate to="/admin" replace />} />
 
               {/* User facing layout */}
               <Route path="/" element={<Layout />}>

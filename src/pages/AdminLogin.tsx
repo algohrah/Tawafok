@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Lock, ShieldCheck, Eye, EyeOff, LogIn } from 'lucide-react';
+import { Lock, Mail, ShieldCheck, Eye, EyeOff, LogIn } from 'lucide-react';
 import { verifyLocalAdmin } from '../lib/adminAuth';
 import { useApp } from '../lib/AppContext';
 
@@ -10,6 +10,7 @@ const ADMIN_EMAIL = 'admin@tawafok.com';
 export default function AdminLogin() {
   const navigate = useNavigate();
   const { loginWithSession, showToast } = useApp();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState('');
@@ -18,11 +19,21 @@ export default function AdminLogin() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!email.trim()) {
+      setError('يرجى إدخال البريد الإلكتروني.');
+      return;
+    }
+    if (!password) {
+      setError('يرجى إدخال كلمة المرور.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const ok = await verifyLocalAdmin(ADMIN_EMAIL, password);
+      const ok = await verifyLocalAdmin(email.trim().toLowerCase(), password);
       if (!ok) {
-        setError('كلمة المرور غير صحيحة.');
+        setError('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
         setLoading(false);
         return;
       }
@@ -56,20 +67,33 @@ export default function AdminLogin() {
             <ShieldCheck className="w-8 h-8 text-amber-600" />
           </div>
           <h1 className="font-cairo font-extrabold text-2xl text-navy-900">لوحة الإدارة</h1>
-          <p className="text-sm text-slate-500 font-tajawal mt-1">ادخل كلمة مرور المدير للمتابعة</p>
+          <p className="text-sm text-slate-500 font-tajawal mt-1">ادخل بيانات المدير للمتابعة</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-xl p-3 text-sm font-tajawal text-center">
               {error}
             </div>
           )}
 
-          <div className="text-center text-xs text-slate-400 font-tajawal bg-slate-50 rounded-xl py-2 px-3">
-            {ADMIN_EMAIL}
+          {/* حقل البريد الإلكتروني */}
+          <div className="relative">
+            <Mail className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="البريد الإلكتروني"
+              className="w-full pr-12 pl-4 py-3.5 rounded-2xl bg-slate-50 border-2 border-slate-200 focus:border-amber-500 focus:outline-none font-tajawal text-navy-900 transition-colors"
+              dir="ltr"
+              autoComplete="username"
+              autoFocus
+            />
           </div>
 
+          {/* حقل كلمة المرور */}
           <div className="relative">
             <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
@@ -77,10 +101,10 @@ export default function AdminLogin() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="كلمة المرور"
               className="w-full pr-12 pl-12 py-3.5 rounded-2xl bg-slate-50 border-2 border-slate-200 focus:border-amber-500 focus:outline-none font-tajawal text-navy-900 transition-colors"
               dir="ltr"
-              autoFocus
+              autoComplete="current-password"
             />
             <button
               type="button"
@@ -94,7 +118,7 @@ export default function AdminLogin() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white font-cairo font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-colors shadow-sm"
+            className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white font-cairo font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-colors shadow-sm mt-2"
           >
             <LogIn className="w-5 h-5" />
             {loading ? 'جارٍ الدخول...' : 'دخول للوحة الإدارة'}
