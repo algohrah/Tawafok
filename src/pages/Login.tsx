@@ -18,7 +18,6 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // الصفحة اللي كان يبيها المستخدم قبل ما يتحوّل لتسجيل الدخول
   const from = (location.state as { from?: string })?.from || '/profile';
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -29,79 +28,29 @@ export default function Login() {
     try {
       const cleanEmail = email.trim().toLowerCase();
 
-      // التحقق من بيانات المدير المخزّنة (وضع قاعدة البيانات المحلية):
-      // يُمنح صلاحية الإدارة فقط بعد مطابقة تجزئة كلمة المرور المخزنة
-      let localAdminVerified = false;
-      let matchedModerator: any = null;
-      if (typeof window !== 'undefined' && await isLocalAdminEmail(cleanEmail)) {
-        localAdminVerified = await verifyLocalAdmin(cleanEmail, password);
-        if (!localAdminVerified) {
-          // كلمة مرور المدير خاطئة — لا تُنشأ أي جلسة
-          setError('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
+      // ===== مسار الإدارة =====
+      if (await isLocalAdminEmail(cleanEmail)) {
+        const adminOk = await verifyLocalAdmin(cleanEmail, password);
+        if (!adminOk) {
+          setError('كلمة المرور غير صحيحة.');
           setLoading(false);
           return;
         }
+        // تسجيل دخول المدير مباشرةً دون استدعاء signInWithPassword
+        let matchedModerator: any = null;
         try {
           const savedUsers = JSON.parse(localStorage.getItem('saved_admin_users') || '[]');
           if (Array.isArray(savedUsers)) {
             matchedModerator = savedUsers.find((u: any) => u.email?.toLowerCase().trim() === cleanEmail);
           }
         } catch { /* ignore */ }
-      }
 
-      // مصادقة حقيقية عبر قاعدة البيانات المحلية Auth
-      const { error: signInError } = await authClient.auth.signInWithPassword({ email: email.trim(), password });
-
-      if (signInError) {
-        if (localAdminVerified) {
-          // دخول المدير بعد مطابقة كلمة المرور المخزنة
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('twafok_demo_admin', 'true');
-            localStorage.setItem('twafok_active_admin_email', cleanEmail);
-            if (matchedModerator) {
-              localStorage.setItem('twafok_current_admin_user', JSON.stringify(matchedModerator));
-            }
-          }
-          loginWithSession({
-            id: matchedModerator?.id || 'admin-1',
-            nickname: matchedModerator?.name || 'المدير العام',
-            email: cleanEmail,
-            verified: true,
-            plan: 'featured',
-          } as any, cleanEmail);
-          showToast('تم تسجيل الدخول بصلاحية الإدارة', 'success');
-          navigate('/admin');
-          return;
+        localStorage.setItem('twafok_demo_admin', 'true');
+        localStorage.setItem('twafok_active_admin_email', cleanEmail);
+        if (matchedModerator) {
+          localStorage.setItem('twafok_current_admin_user', JSON.stringify(matchedModerator));
         }
-        setError('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
-        setLoading(false);
-        return;
-      }
-
-      // محاولة التحقق عبر /api/whoami بأمان
-      let who: any = null;
-      try {
-        const { data: { session } } = await authClient.auth.getSession();
-        const token = session?.access_token;
-        if (token) {
-          const res = await fetch('/api/whoami', { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
-          if (res && res.ok) {
-            who = await res.json().catch(() => null);
-          }
-        }
-      } catch { /* ignore */ }
-
-      // المشرف الحقيقي (خادميًا) أو المدير المحلي بعد مطابقة كلمة المرور
-      if (who?.isAdmin || localAdminVerified) {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('twafok_demo_admin', 'true');
-          localStorage.setItem('twafok_active_admin_email', cleanEmail);
-          if (matchedModerator) {
-            localStorage.setItem('twafok_current_admin_user', JSON.stringify(matchedModerator));
-          }
-        }
-        if (who?.member) loginWithSession(who.member, who.authUser?.email || cleanEmail);
-        else loginWithSession({
+        loginWithSession({
           id: matchedModerator?.id || 'admin-1',
           nickname: matchedModerator?.name || 'المدير العام',
           email: cleanEmail,
@@ -113,35 +62,28 @@ export default function Login() {
         return;
       }
 
-      if (who?.member) {
-        loginWithSession(who.member, who.authUser?.email || cleanEmail);
-        navigate(from);
+      // ===== مسار الأعضاء العاديين =====
+      const { error: signInError } = await authClient.auth.signInWithPassword({ email: email.trim(), password });
+
+      if (signInError) {
+        setError('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
+        setLoading(false);
         return;
       }
 
       // البحث عن العضو في قاعدة البيانات المحلية
-      if (typeof window !== 'undefined') {
-        try {
-          const savedMembers = JSON.parse(localStorage.getItem('saved_members_list') || '[]');
-          const localMember = Array.isArray(savedMembers)
-            ? savedMembers.find((m: any) => m.email?.toLowerCase().trim() === cleanEmail)
-            : null;
+      try {
+        const savedMembers = JSON.parse(localStorage.getItem('saved_members_list') || '[]');
+        const localMember = Array.isArray(savedMembers)
+          ? savedMembers.find((m: any) => m.email?.toLowerCase().trim() === cleanEmail)
+          : null;
+        if (localMember) {
+          loginWithSession(localMember, cleanEmail);
+          navigate(from);
+          return;
+        }
+      } catch { /* ignore */ }
 
-          if (localMember) {
-            // التحقق من كلمة المرور إذا كانت مخزنة
-            if (localMember.password && localMember.password !== password) {
-              setError('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
-              setLoading(false);
-              return;
-            }
-            loginWithSession(localMember, cleanEmail);
-            navigate(from);
-            return;
-          }
-        } catch { /* ignore */ }
-      }
-
-      // إذا لم يُعثر على العضو في قاعدة البيانات
       setError('لا يوجد حساب بهذا البريد الإلكتروني. يرجى التسجيل أولاً.');
     } catch (err: any) {
       setError(err?.message || 'حدث خطأ غير متوقع، حاول مرة أخرى');
