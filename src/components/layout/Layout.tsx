@@ -50,8 +50,8 @@ export default function Layout() {
       <MobileNav />
       <ToastContainer />
 
-      {/* زر واتساب العائم */}
-      {socialSettings?.showWhatsapp && cleanNumber && (
+      {/* الرئيسية تعرض واتساب داخل قسم المساعدة لتجنب حجب المحتوى. */}
+      {pathname !== '/' && socialSettings?.showWhatsapp && cleanNumber && (
         <motion.a
           href={`https://wa.me/${cleanNumber}`}
           target="_blank"

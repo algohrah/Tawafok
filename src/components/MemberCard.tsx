@@ -13,7 +13,7 @@ import { useApp } from '../lib/AppContext';
 import { formatMaritalStatus } from '../lib/memberUtils';
 import MemberProfileModal from './MemberProfileModal';
 
-export default function MemberCard({ member }: { member: Member; key?: any }) {
+export default function MemberCard({ member, homePreview = false }: { member: Member; homePreview?: boolean; key?: any }) {
   const navigate = useNavigate();
   const [modalOpen, setModalOpen] = useState(false);
   const { user, likedMembers, toggleLike, showToast } = useApp();
@@ -50,7 +50,7 @@ export default function MemberCard({ member }: { member: Member; key?: any }) {
       <motion.div
         whileHover={{ y: -4 }}
         transition={{ type: 'spring', stiffness: 300, damping: 22 }}
-        className="group bg-white rounded-2xl overflow-hidden shadow-soft hover:shadow-luxe transition-shadow duration-500 border border-cream-200/70 flex flex-col h-full cursor-pointer"
+        className={`${homePreview ? 'home-member-card ' : ''}group bg-white rounded-2xl overflow-hidden shadow-soft hover:shadow-luxe transition-shadow duration-500 border border-cream-200/70 flex flex-col h-full cursor-pointer`}
         onClick={handleOpenModal}
       >
         <div className="block flex flex-col flex-1 no-tap-highlight select-none">
@@ -66,7 +66,7 @@ export default function MemberCard({ member }: { member: Member; key?: any }) {
 
               {/* الاسم + صف الشارات المرتّب */}
               <div className="flex-1 min-w-0 pr-1">
-                <h3 className="font-cairo font-bold text-navy-900 text-sm sm:text-base leading-tight truncate">
+                <h3 className={`${homePreview ? 'home-card-title ' : ''}font-cairo font-bold text-navy-900 text-sm sm:text-base leading-tight truncate`}>
                   {displayName}
                 </h3>
                 {/* صف واحد مرتّب لجميع الشارات */}
@@ -75,21 +75,23 @@ export default function MemberCard({ member }: { member: Member; key?: any }) {
                     <GenderIcon isMale={isMale} white />
                     <span className="text-[9px] sm:text-[10px] font-cairo font-bold">{isMale ? 'رجل' : 'امرأة'}</span>
                   </span>
-                  {isImported && (
+                  {homePreview ? (
+                    <span className="home-card-source">{isImported ? 'ملف وساطة تديره الإدارة' : 'عضو مسجّل'}</span>
+                  ) : isImported && (
                     <span className="inline-flex items-center gap-0.5 bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded-md text-[8.5px] sm:text-[9.5px] font-cairo font-bold" title="ملف مرفوع من قبل الإدارة">
                       📋 مرفوع من الإدارة
                     </span>
                   )}
                   {member.verified && (
-                    <span className="inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md" title="موثّق">
+                    <span className="inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md" title="موثّق" aria-label="حساب موثّق">
                       <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     </span>
                   )}
                   {isFeatured(member) && <FeaturedBadge />}
 
                   {member.hasSeriousnessBadge && (
-                    <span className="inline-flex items-center gap-0.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-extrabold text-[8px] md:text-[9px] px-1.5 py-0.5 rounded-md font-cairo" title="وسام الجدية المعتمد">
-                      🏅 جاد
+                    <span className="inline-flex items-center gap-0.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-extrabold text-[8px] md:text-[9px] px-1.5 py-0.5 rounded-md font-cairo" title={homePreview ? 'وسام الجدية — ليس ضمانًا للتوافق' : 'وسام الجدية المعتمد'}>
+                      🏅 {homePreview ? 'وسام الجدية' : 'جاد'}
                     </span>
                   )}
                 </div>
@@ -108,7 +110,7 @@ export default function MemberCard({ member }: { member: Member; key?: any }) {
             </div>
 
             {/* شبكة المعلومات: العمر + الحالة + الوظيفة */}
-            <div className="grid grid-cols-3 gap-1 sm:gap-2 mb-2 sm:mb-2.5">
+            <div className={`${homePreview ? 'home-card-facts ' : ''}grid grid-cols-3 gap-1 sm:gap-2 mb-2 sm:mb-2.5`}>
               {[
                 { icon: Calendar, label: 'العمر', value: member.age ? `${member.age} سنة` : '—', sub: '' },
                 { icon: Users, label: 'الحالة', value: maritalFormatted, sub: '' },
@@ -129,7 +131,7 @@ export default function MemberCard({ member }: { member: Member; key?: any }) {
             </div>
 
             {/* قسم "أبحث عن" (الملاحظات الكتابية كما كانت) */}
-            <div className={`rounded-lg sm:rounded-xl ${c.bg} p-2 mb-2 sm:p-2.5 sm:mb-2.5`}>
+            <div className={`${homePreview ? 'home-card-partner ' : ''}rounded-lg sm:rounded-xl ${c.bg} p-2 mb-2 sm:p-2.5 sm:mb-2.5`}>
               <div className="flex items-center gap-1.5 mb-1">
                 <Heart className={`w-3.5 h-3.5 ${c.text}`} />
                 <span className={`text-[11px] font-cairo font-bold ${c.textStrong} whitespace-nowrap`}>أبحث عن</span>
@@ -146,7 +148,7 @@ export default function MemberCard({ member }: { member: Member; key?: any }) {
             </div>
 
             {/* الأزرار — زر الحفظ أيقونة فقط + زر العرض موسّع */}
-            <div className="mt-auto flex items-center gap-2">
+            <div className={`${homePreview ? 'home-card-controls ' : ''}mt-auto flex items-center gap-2`}>
               <button
                 onClick={(e) => {
                   e.preventDefault();
