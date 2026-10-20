@@ -1,6 +1,6 @@
 import { isFeatured } from '../../shared/membership.js';
 import { useEffect, useMemo, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, MouseEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, BadgeCheck, CalendarClock, CheckCircle2, ChevronDown,
@@ -99,6 +99,15 @@ export default function Home() {
     navigate(`/search?${params.toString()}`);
   };
 
+  // Prevent fragment links from being interpreted as routes by HashRouter on Pages.
+  const scrollToSection = (event: MouseEvent<HTMLAnchorElement>, sectionId: string) => {
+    event.preventDefault();
+    const section = document.getElementById(sectionId);
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    section?.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
+    section?.focus({ preventScroll: true });
+  };
+
   const whatsappNumber = socialSettings?.whatsappNumber?.replace(/[+\s-]/g, '') || '';
   const showWhatsapp = socialSettings?.showWhatsapp && /^\d{7,15}$/.test(whatsappNumber);
 
@@ -115,7 +124,7 @@ export default function Home() {
               <Link className="home-button home-button-light" to={isLoggedIn ? '/profile' : '/search'}>{isLoggedIn ? 'ملفي الشخصي' : 'تصفّح الملفات'}</Link>
             </div>
             <p className="home-free-note">التسجيل والبحث الأساسي مجانيان. العضوية المميزة ورسائل الاستفسار ورسوم رحلة التوافق منفصلة.</p>
-            <a className="home-text-link home-link-light" href="#home-fees">ما هو مجاني وما هو مدفوع؟<ArrowLeft aria-hidden="true" size={16} /></a>
+            <Link className="home-text-link home-link-light" to="/#home-fees" onClick={(event) => scrollToSection(event, 'home-fees')}>ما هو مجاني وما هو مدفوع؟<ArrowLeft aria-hidden="true" size={16} /></Link>
           </div>
 
           <form className="home-search" onSubmit={handleQuickSearch} aria-labelledby="home-search-title">
@@ -135,7 +144,7 @@ export default function Home() {
 
       <section className="home-overview" aria-label="الخدمة في ثلاث خطوات">
         <div className="home-container home-overview-grid">{overviewSteps.map((step, index) => <div className="home-overview-item" key={step.title}><span className="home-step-icon"><step.icon aria-hidden="true" size={21} /></span><div><h2><span className="home-step-number">{index + 1}.</span> {step.title}</h2><p>{step.description}</p></div></div>)}</div>
-        <div className="home-container"><a className="home-text-link home-overview-link" href="#home-journey">تعرّف على مراحل التوافق<ArrowLeft aria-hidden="true" size={16} /></a></div>
+        <div className="home-container"><Link className="home-text-link home-overview-link" to="/#home-journey" onClick={(event) => scrollToSection(event, 'home-journey')}>تعرّف على مراحل التوافق<ArrowLeft aria-hidden="true" size={16} /></Link></div>
       </section>
 
       <section id="featured-members" className="home-section" aria-labelledby="featured-members-heading">
@@ -155,7 +164,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="home-journey" className="home-section" aria-labelledby="home-journey-title">
+      <section tabIndex={-1} id="home-journey" className="home-section" aria-labelledby="home-journey-title">
         <div className="home-container">
           <div className="home-section-heading"><div><p className="home-eyebrow">من الطلب إلى القرار</p><h2 id="home-journey-title">كيف تسير رحلة التوافق؟</h2><p>هذه مراحل رحلة الأعضاء المسجّلين. أما ملفات الوساطة فيتولى الفريق التنسيق بشأنها مع الجهة المعنية.</p></div></div>
           <ol className="home-journey-grid">{journeySteps.map((step, index) => <li className="home-journey-step" key={step.title}><div className="home-journey-top"><span className="home-journey-number">{String(index + 1).padStart(2, '0')}</span><step.icon aria-hidden="true" size={23} /></div><h3>{step.title}</h3><p>{step.description}</p></li>)}</ol>
@@ -163,7 +172,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="home-fees" className="home-section home-section-soft" aria-labelledby="home-fees-title">
+      <section tabIndex={-1} id="home-fees" className="home-section home-section-soft" aria-labelledby="home-fees-title">
         <div className="home-container">
           <div className="home-section-heading"><div><p className="home-eyebrow">وضوح قبل الالتزام</p><h2 id="home-fees-title">اعرف ما هو مجاني وما هو مدفوع</h2><p>أربع خدمات واضحة. الاشتراك في إحداها لا يعني شمول الخدمات الأخرى.</p></div></div>
           <div className="home-service-grid">{serviceOptions.map((option) => <article key={option.title} className="home-service"><div className="home-service-top"><span className="home-service-number">{option.number}</span><span className="home-service-label">{option.label}</span></div><h3>{option.title}</h3><p>{option.description}</p></article>)}</div>
