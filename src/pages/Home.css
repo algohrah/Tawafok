@@ -81,7 +81,14 @@
 .home-page .home-section-note { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--home-muted); margin-top: 20px; }
 .home-section-note > svg { flex-shrink: 0; margin-top: 4px; }
 .home-page .home-member-card { border-color: var(--home-border); box-shadow: none; }
-.home-member-card .home-card-title { font-size: 16px; line-height: 1.6; }
+.home-member-card .home-card-banner { padding: 16px; min-height: 156px; }
+.home-member-card .home-card-heading { display: flex; align-items: center; gap: 10px; min-height: 48px; }
+.home-member-card .home-card-avatar { width: 36px; height: 36px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: 1px solid currentColor; border-radius: 12px; }
+.home-member-card .home-card-title { font-size: 16px; line-height: 1.6; color: var(--home-ink); font-weight: 700; overflow-wrap: anywhere; }
+.home-member-card .home-card-badges { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.home-member-card .home-card-badges > span { font-size: 12px; line-height: 1.6; max-width: 100%; }
+.home-member-card .home-card-fact-label { font-size: 12px; line-height: 1.5; }
+.dark .home-member-card .home-card-source { background: #1c2a40; color: #d4deea; border-color: #405878; }
 .home-member-card .home-card-source { font-size: 12px; line-height: 1.6; color: #30435f; background: #e8edf4; border: 1px solid #d4deea; padding: 3px 6px; border-radius: 6px; }
 .home-member-card .home-card-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .home-member-card .home-card-facts > :last-child { grid-column: 1 / -1; }
@@ -132,15 +139,19 @@
 @media (max-width: 767px) {
   .home-container { width: calc(100% - 32px); }
   .home-section { padding-block: 36px; }
-  .home-hero-grid { grid-template-columns: minmax(0, 1fr); padding-block: 32px; gap: 28px; }
-  .home-hero h1 { font-size: 32px; }
-  .home-page .home-hero-description { font-size: 16px; margin-top: 16px; }
+  .home-hero-grid { grid-template-columns: minmax(0, 1fr); padding-block: 24px; gap: 24px; }
+  .home-hero h1 { font-size: 30px; }
+  .home-page .home-hero-description { font-size: 16px; line-height: 1.8; margin-top: 16px; }
   .home-actions { margin-top: 20px; }
-  .home-actions .home-button { flex: 1 1 auto; padding-inline: 16px; }
+  .home-actions .home-button { flex: 1 1 0; min-width: 0; padding-inline: 12px; font-size: 15px; }
   .home-page .home-search { padding: 20px; border-radius: 16px; }
   .home-overview-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }
   .home-section-heading { flex-direction: column; align-items: stretch; gap: 8px; margin-bottom: 20px; }
   .home-member-grid { gap: 12px; }
+  .home-member-card .home-card-banner { padding: 12px; min-height: 172px; }
+  .home-member-card .home-card-heading { gap: 8px; align-items: flex-start; }
+  .home-member-card .home-card-avatar { width: 28px; height: 32px; border: 0; }
+  .home-member-card .home-card-title { font-size: 15px; }
   .home-journey-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
   .home-page .home-journey-step h3 { font-size: 18px; }
   .home-page .home-journey-step p { font-size: 15px; }

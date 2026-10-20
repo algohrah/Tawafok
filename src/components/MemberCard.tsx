@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   MapPin, ShieldCheck, Crown, Bookmark, Eye,
-  Briefcase, Calendar, Users, Heart,
+  Briefcase, Calendar, Users, Heart, UserRound,
 } from 'lucide-react';
 import type { Member } from '../lib/members';
 import { getAvatar, getGenderColors } from '../lib/types';
@@ -55,6 +55,21 @@ export default function MemberCard({ member, homePreview = false }: { member: Me
       >
         <div className="block flex flex-col flex-1 no-tap-highlight select-none">
           {/* ===== الرأس المبسّط: الصورة + الاسم + صف الشارات ===== */}
+          {homePreview ? (
+            <div className={`home-card-banner ${c.bg}`}>
+              <div className="home-card-heading">
+                <span className={`home-card-avatar ${c.text}`}><UserRound aria-hidden="true" size={24} /></span>
+                <h3 className="home-card-title">{displayName}</h3>
+              </div>
+              <div className="home-card-badges">
+                <span className={c.textStrong}>{isMale ? 'رجل' : 'امرأة'}</span>
+                {member.verified && <span className="inline-flex items-center gap-1 text-emerald-700" title="توثيق منفصل عن العضوية المميزة"><ShieldCheck aria-hidden="true" size={14} />موثّق</span>}
+                {isFeatured(member) && <FeaturedBadge />}
+                {member.hasSeriousnessBadge && <span className="text-gold-700" title="وسام الجدية — ليس ضمانًا للتوافق">وسام الجدية</span>}
+                <span className="home-card-source">{isImported ? 'ملف وساطة تديره الإدارة' : 'عضو مسجّل'}</span>
+              </div>
+            </div>
+          ) : (
           <div className={`relative ${c.bg} p-2.5 sm:p-4`}>
             <div className="flex items-center gap-2 sm:gap-3">
               {/* الصورة الافتراضية */}
@@ -66,7 +81,7 @@ export default function MemberCard({ member, homePreview = false }: { member: Me
 
               {/* الاسم + صف الشارات المرتّب */}
               <div className="flex-1 min-w-0 pr-1">
-                <h3 className={`${homePreview ? 'home-card-title ' : ''}font-cairo font-bold text-navy-900 text-sm sm:text-base leading-tight truncate`}>
+                <h3 className="font-cairo font-bold text-navy-900 text-sm sm:text-base leading-tight truncate">
                   {displayName}
                 </h3>
                 {/* صف واحد مرتّب لجميع الشارات */}
@@ -75,29 +90,28 @@ export default function MemberCard({ member, homePreview = false }: { member: Me
                     <GenderIcon isMale={isMale} white />
                     <span className="text-[9px] sm:text-[10px] font-cairo font-bold">{isMale ? 'رجل' : 'امرأة'}</span>
                   </span>
-                  {homePreview ? (
-                    <span className="home-card-source">{isImported ? 'ملف وساطة تديره الإدارة' : 'عضو مسجّل'}</span>
-                  ) : isImported && (
+                  {isImported && (
                     <span className="inline-flex items-center gap-0.5 bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded-md text-[8.5px] sm:text-[9.5px] font-cairo font-bold" title="ملف مرفوع من قبل الإدارة">
                       📋 مرفوع من الإدارة
                     </span>
                   )}
                   {member.verified && (
-                    <span className="inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md" title="موثّق" aria-label="حساب موثّق">
+                    <span className="inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md" title="موثّق">
                       <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     </span>
                   )}
                   {isFeatured(member) && <FeaturedBadge />}
 
                   {member.hasSeriousnessBadge && (
-                    <span className="inline-flex items-center gap-0.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-extrabold text-[8px] md:text-[9px] px-1.5 py-0.5 rounded-md font-cairo" title={homePreview ? 'وسام الجدية — ليس ضمانًا للتوافق' : 'وسام الجدية المعتمد'}>
-                      🏅 {homePreview ? 'وسام الجدية' : 'جاد'}
+                    <span className="inline-flex items-center gap-0.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-extrabold text-[8px] md:text-[9px] px-1.5 py-0.5 rounded-md font-cairo" title="وسام الجدية المعتمد">
+                      🏅 جاد
                     </span>
                   )}
                 </div>
               </div>
             </div>
           </div>
+          )}
 
           {/* ===== جسم البطاقة ===== */}
           <div className="p-2.5 sm:p-4 flex flex-col flex-1">
@@ -123,7 +137,7 @@ export default function MemberCard({ member, homePreview = false }: { member: Me
                       {item.value}
                     </div>
                   </div>
-                  <div className="text-[8px] sm:text-[9px] text-navy-400 font-tajawal break-words whitespace-normal line-clamp-1 mt-1">
+                  <div className={`${homePreview ? 'home-card-fact-label ' : ''}text-[8px] sm:text-[9px] text-navy-400 font-tajawal break-words whitespace-normal line-clamp-1 mt-1`}>
                     {item.label}
                   </div>
                 </div>

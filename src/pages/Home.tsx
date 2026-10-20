@@ -117,13 +117,13 @@ export default function Home() {
         <div className="home-container home-hero-grid">
           <div>
             <p className="home-eyebrow home-eyebrow-light">توافق · بحث ووساطة للزواج</p>
-            <h1 id="home-title">ابدأ البحث عن شريك حياة <span>بخطوات واضحة</span></h1>
-            <p className="home-hero-description">تصفّح الملفات بحسب مواصفاتك، وأرسل طلب توافق، وتابع مراحل الطلب والتنسيق من حسابك. ولملفات الوساطة المضافة من الإدارة، يتولى الفريق التنسيق مع الجهة المعنية.</p>
+            <h1 id="home-title">ابحث عن شريك حياة <span>بخطوات واضحة</span></h1>
+            <p className="home-hero-description">تصفّح الملفات، وأرسل طلب توافق، وتابع الخطوات من حسابك. ولملفات الوساطة، يتولى الفريق التنسيق مع الجهة المعنية.</p>
             <div className="home-actions">
-              <Link className="home-button home-button-gold" to={isLoggedIn ? '/search' : '/register'}>{isLoggedIn ? 'تصفّح الملفات' : 'أنشئ حسابًا مجانيًا'}<ArrowLeft aria-hidden="true" size={18} /></Link>
+              <Link className="home-button home-button-gold" to={isLoggedIn ? '/search' : '/register'}>{isLoggedIn ? 'تصفّح الملفات' : 'إنشاء حساب مجاني'}<ArrowLeft aria-hidden="true" size={18} /></Link>
               <Link className="home-button home-button-light" to={isLoggedIn ? '/profile' : '/search'}>{isLoggedIn ? 'ملفي الشخصي' : 'تصفّح الملفات'}</Link>
             </div>
-            <p className="home-free-note">التسجيل والبحث الأساسي مجانيان. العضوية المميزة ورسائل الاستفسار ورسوم رحلة التوافق منفصلة.</p>
+            <p className="home-free-note">التسجيل والبحث الأساسي مجانيان. الاشتراك والرسائل ورسوم الرحلة منفصلة.</p>
             <Link className="home-text-link home-link-light" to="/#home-fees" onClick={(event) => scrollToSection(event, 'home-fees')}>ما هو مجاني وما هو مدفوع؟<ArrowLeft aria-hidden="true" size={16} /></Link>
           </div>
 
