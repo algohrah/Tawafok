@@ -96,6 +96,8 @@
 .home-member-card .home-card-facts [title] + div { font-size: 12px; }
 .home-member-card .home-card-partner p { font-size: 14px; line-height: 1.7; }
 .home-member-card .home-card-controls button { min-height: 44px; font-size: 14px; }
+.home-page .home-card-controls button:last-child { background: #0b1828; color: #fff; }
+.dark .home-page .home-card-controls button:last-child { background: #f8dc91; color: #0b1828; }
 .home-journey-grid { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 32px; }
 .home-journey-step { padding-block: 24px; border-top: 1px solid var(--home-border); }
 .home-journey-top { display: flex; justify-content: space-between; align-items: center; color: var(--home-accent); margin-bottom: 12px; }
@@ -142,7 +144,7 @@
   .home-hero-grid { grid-template-columns: minmax(0, 1fr); padding-block: 24px; gap: 24px; }
   .home-hero h1 { font-size: 30px; }
   .home-page .home-hero-description { font-size: 16px; line-height: 1.8; margin-top: 16px; }
-  .home-actions { margin-top: 20px; }
+  .home-actions { margin-top: 20px; align-items: stretch; }
   .home-actions .home-button { flex: 1 1 0; min-width: 0; padding-inline: 12px; font-size: 15px; }
   .home-page .home-search { padding: 20px; border-radius: 16px; }
   .home-overview-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }
