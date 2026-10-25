@@ -13,10 +13,12 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
-.member-card .member-card-view { background: #0b1828; color: #fff; }
+.member-card .member-card-view { background: #0b1828; color: #fff; font-size: 12px; line-height: 1.4; gap: 6px; white-space: nowrap; }
+.member-card .member-card-view svg { width: 16px; height: 16px; flex-shrink: 0; }
 .dark .member-card .member-card-view { background: #f8dc91; color: #0b1828; }
 @media (min-width: 640px) {
   .member-card h3.member-card-title { font-size: 13px; }
+  .member-card .member-card-view { font-size: 13px; }
 }
 .member-card .member-card-gender-male { background: #1d4ed8; }
 .member-card .member-card-gender-female { background: #be123c; }
