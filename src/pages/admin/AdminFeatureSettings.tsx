@@ -196,7 +196,7 @@ export default function AdminFeatureSettings() {
           <div className="divide-y divide-slate-50 pt-1">
             <Toggle
               label="السماح بإخفاء الحساب مؤقتاً"
-              desc="إتاحة خيار للأعضاء لإخفاء ملفاتهم من البحث مع بقاء محادثاتهم الحالية نشطة"
+              desc="إتاحة خيار للأعضاء لإخفاء ملفاتهم من البحث مع بقاء طلباتهم وتذاكر الدعم"
               icon={EyeOff}
               value={localHiding}
               onChange={setLocalHiding}

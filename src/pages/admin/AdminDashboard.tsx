@@ -290,7 +290,7 @@ export default function AdminDashboard() {
           </Link>
         </div>
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
-          <p className="text-xs text-slate-400 font-tajawal mb-3">اختر عضواً للدخول بحسابه ومعاينة تجربته كأنك هو — يمكنك قبول/رفض الطلبات وإرسال الرسائل والتصفّح.</p>
+          <p className="text-xs text-slate-400 font-tajawal mb-3">اختر عضواً للدخول بحسابه ومعاينة تجربته كأنك هو — يمكنك قبول/رفض الطلبات ومراسلة الإدارة والتصفّح.</p>
           <div className="flex flex-wrap gap-2">
             {adminMembers.slice(0, 10).map((m) => (
               <button
