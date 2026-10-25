@@ -128,7 +128,6 @@ export class LocalStorageSettingsRepository implements ISettingsRepository {
 }
 
 export class LocalStorageAdapter implements IDatabaseAdapter {
-  constructor() { localStore.initializeCleanJourneyWorkflow(); }
   members: IRepository<any> = new LocalStorageRepository<any>('twafok_members');
   requests: IRepository<any> = new LocalStorageRepository<any>('twafok_requests');
   transactions: IRepository<any> = new LocalStorageRepository<any>('twafok_transactions');

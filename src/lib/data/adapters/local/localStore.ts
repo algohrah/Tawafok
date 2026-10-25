@@ -353,8 +353,13 @@ function seedDB(): DB {
 const JOURNEY_RESET_KEY = 'tawafok_journey_clean_start_v3';
 /** User-authorized deletion. Runs once per browser, before AppContext reads settings. No backups are created. */
 export function initializeCleanJourneyWorkflow(): void {
-  if (typeof window === 'undefined' || window.localStorage.getItem(JOURNEY_RESET_KEY) === 'done') return;
+  if (typeof window === 'undefined') return;
   const storage = window.localStorage;
+  const completedBefore = storage.getItem(JOURNEY_RESET_KEY) === 'done';
+  let current: any = null;
+  try { current = JSON.parse(storage.getItem(STORAGE_KEY) || 'null'); } catch {}
+  // Also catch old snapshots restored after the first release's pre-hydration marker.
+  if (completedBefore && Array.isArray(current?.requests) && current.requests.every((r: any) => r?.workflow?.version === 3)) return;
   const keepUnrelatedTransactions = (key: string) => {
     const parsed = JSON.parse(storage.getItem(key) || '[]');
     if (!Array.isArray(parsed)) return;
@@ -366,6 +371,15 @@ export function initializeCleanJourneyWorkflow(): void {
   let unrelatedNotifications: any[] = [];
   try { unrelatedNotifications = (JSON.parse(oldRaw || '{}').notifications || []).filter((n: any) => !n.request_id && !['request', 'match', 'inquiry'].includes(n.type)); } catch {}
   const clean = seedDB(); clean.notifications = unrelatedNotifications;
+  if (completedBefore && current) {
+    // A stale/old backup cannot revive legacy journeys, nor should it delete valid new records in a mixed snapshot.
+    clean.requests = (current.requests || []).filter((r: any) => r?.workflow?.version === 3);
+    const keep = new Set(clean.requests.map(r => r.id));
+    clean.events = (current.events || []).filter((e: any) => keep.has(e.request_id));
+    clean.inquiryMessages = (current.inquiryMessages || []).filter((m: any) => keep.has(m.request_id) && m.sender_id === 'admin');
+    clean.notifications = [...unrelatedNotifications, ...(current.notifications || []).filter((n: any) => keep.has(n.request_id) && n.type !== 'inquiry')];
+    clean.seq = Math.max(100, Number(current.seq) || 0);
+  }
   storage.setItem(STORAGE_KEY, JSON.stringify(clean)); memoryStorage.set(STORAGE_KEY, JSON.stringify(clean)); db = clean;
   keepUnrelatedTransactions('twafok_transactions_v1'); keepUnrelatedTransactions('twafok_transactions');
   for (const key of ['twafok_local_db_v3', 'twafok_local_db_v2', 'twafok_local_db', 'twafok_requests', 'saved_interest_requests', 'saved_exempt_requests', 'user_deposit_quota', 'requests_last_seen', 'journey_settings', 'inquiry_settings', 'pending_requests_expiry_days']) {
