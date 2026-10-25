@@ -21,7 +21,6 @@ const typeConfig = {
   verification: { icon: ShieldCheck, color: 'text-emerald-600 bg-emerald-100' },
   system: { icon: Info, color: 'text-sky-600 bg-sky-100' },
   admin: { icon: Headphones, color: 'text-gold-600 bg-gold-300/15' },
-  inquiry: { icon: MessageSquare, color: 'text-amber-700 bg-amber-100' },
 };
 
 export default function Notifications() {

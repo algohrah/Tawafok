@@ -586,7 +586,7 @@ function AccountTab({ name, onLogout, onRequestVerification }: { name: string; o
                   </div>
                   <div className="text-right">
                     <span className="block text-sm text-navy-800 font-cairo font-bold">إخفاء الحساب مؤقتاً</span>
-                    <span className="block text-[10px] text-navy-400 font-tajawal">إخفاء ملفك من نتائج البحث مؤقتاً مع بقاء المحادثات</span>
+                    <span className="block text-[10px] text-navy-400 font-tajawal">إخفاء ملفك من نتائج البحث مؤقتاً مع بقاء طلباتك وتذاكر الدعم</span>
                   </div>
                 </div>
                 <Toggle checked={isProfileHidden} onChange={toggleProfileHiding} />
@@ -864,7 +864,7 @@ function SubscriptionTab({ currentPlan, plans }: { currentPlan: string; plans: P
         </div>
       </div>
 
-      <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm font-tajawal text-navy-700">الرسائل تُشترى بصورة مستقلة؛ لا يمنح الاشتراك رصيد رسائل. رسوم رحلة التوافق مستقلة عن العضوية.</div>
+      <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm font-tajawal text-navy-700">رسوم رحلة التوافق مستقلة عن العضوية. للاستفسارات والمساعدة تواصل مع الإدارة.</div>
 
       {/* Profile boosting (show only if enabled by admin) */}
       {enableProfileBoosting && (
@@ -1001,7 +1001,7 @@ function RequestsTab() {
                         <sc.icon className="w-3 h-3" /> {sc.label}
                       </span>
                     </div>
-                    <p className="text-sm text-navy-600 font-tajawal leading-relaxed mb-1 line-clamp-2">{req.message}</p>
+                    
                     <p className="text-xs text-navy-400 font-tajawal mb-2">{req.time}</p>
 
                     {isReceivedType && req.status === 'pending' && (

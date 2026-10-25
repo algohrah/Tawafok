@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Headphones, Mail, Clock, CheckCircle2, AlertCircle, X,
   Search, Send, MessageSquare, ChevronLeft, ShieldCheck, Phone, Lock, MapPin, Crown,
@@ -6,16 +6,13 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../lib/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { SupportTicket, InquiryMessage } from '../../lib/types';
+import type { SupportTicket } from '../../lib/types';
 import { type AdminMember } from '../../lib/admin-data';
 import Modal from '../../components/ui/Modal';
 import FilterDropdown from '../../components/admin/FilterDropdown';
 import PageHeader from '../../components/admin/PageHeader';
 import { useReviewMarkers } from '../../lib/useReviewMarkers';
 import { dataService } from '../../lib/data/DataService';
-const getAllInquiryMessages = () => dataService.db.getAllInquiryMessages();
-const moderateInquiryMessage = (messageId: number, action: 'approve' | 'reject', moderatorName: string) => dataService.db.moderateInquiryMessage(messageId, action, moderatorName);
-const deleteInquiryMessage = (messageId: number) => dataService.db.deleteInquiryMessage(messageId);
 const getLiveMemberById = (id: string) => dataService.db.getLiveMemberById(id);
 
 
@@ -48,54 +45,6 @@ export default function AdminMessages() {
     showToast,
     currentAdminName,
   } = useApp();
-
-  // ===== تبويب رئيسي: تذاكر الدعم / مراجعة رسائل الاستفسار =====
-  const [mainTab, setMainTab] = useState<'tickets' | 'inquiry_review'>('tickets');
-
-  // ===== مراجعة رسائل الاستفسار =====
-  const [inquiryMessages, setInquiryMessages] = useState<(InquiryMessage & { request_id: number })[]>([]);
-  const [inquiryFilter, setInquiryFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
-  const [inquirySearch, setInquirySearch] = useState('');
-  const [confirmDeleteMsg, setConfirmDeleteMsg] = useState<number | null>(null);
-
-  const refreshInquiryMessages = () => setInquiryMessages(getAllInquiryMessages());
-  useEffect(() => { refreshInquiryMessages(); }, [mainTab]);
-
-  const handleModerateInquiry = (messageId: number, action: 'approve' | 'reject') => {
-    const ok = moderateInquiryMessage(messageId, action, currentAdminName);
-    if (ok) {
-      showToast(action === 'approve' ? 'تمت الموافقة على الرسالة ونشرها للطرفين ✓' : 'تم رفض الرسالة وحجبها ✕', action === 'approve' ? 'success' : 'info');
-      refreshInquiryMessages();
-    } else {
-      showToast('تعذّر تنفيذ الإجراء', 'error');
-    }
-  };
-
-  const handleDeleteInquiry = () => {
-    if (confirmDeleteMsg === null) return;
-    const ok = deleteInquiryMessage(confirmDeleteMsg);
-    if (ok) {
-      showToast('تم اعتراض الرسالة وحذفها من المحادثة نهائياً 🗑️', 'success');
-      refreshInquiryMessages();
-    } else {
-      showToast('تعذّر حذف الرسالة', 'error');
-    }
-    setConfirmDeleteMsg(null);
-  };
-
-  const filteredInquiryMessages = useMemo(() => {
-    return inquiryMessages.filter((m) => {
-      const matchSearch = !inquirySearch || m.text.includes(inquirySearch);
-      const matchFilter =
-        inquiryFilter === 'all' ? true :
-        inquiryFilter === 'pending' ? (!m.approved && !m.rejected) :
-        inquiryFilter === 'approved' ? !!m.approved :
-        inquiryFilter === 'rejected' ? !!m.rejected : true;
-      return matchSearch && matchFilter;
-    });
-  }, [inquiryMessages, inquirySearch, inquiryFilter]);
-
-  const pendingInquiryCount = inquiryMessages.filter(m => !m.approved && !m.rejected).length;
 
   // ===== تتبّع المراجعة الدائم (لا يختفي عند تحديث الصفحة) =====
   const { markReviewed, isReviewed, getMark } = useReviewMarkers('twafok_reviewed_tickets');
@@ -205,49 +154,8 @@ export default function AdminMessages() {
         icon={Headphones}
         title="الرسائل والدعم الفني"
         subtitle="استلام تذاكر الدعم والتحكيم الشرعي من الخاطبين، التخاطب معهم وتنسيق الرؤية الشرعية"
-        action={
-          <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
-            <button
-              onClick={() => setMainTab('tickets')}
-              aria-label="عرض تذاكر الدعم"
-              className={`px-4 py-2 rounded-lg text-xs font-cairo font-bold transition-all flex items-center gap-1.5 ${mainTab === 'tickets' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              <Headphones className="w-4 h-4" /> تذاكر الدعم
-            </button>
-            <button
-              onClick={() => setMainTab('inquiry_review')}
-              aria-label="مراجعة رسائل الاستفسار"
-              className={`px-4 py-2 rounded-lg text-xs font-cairo font-bold transition-all flex items-center gap-1.5 relative ${mainTab === 'inquiry_review' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              <ShieldAlert className="w-4 h-4" /> مراجعة رسائل الاستفسار
-              {pendingInquiryCount > 0 && (
-                <span className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center ring-2 ring-white">
-                  {pendingInquiryCount}
-                </span>
-              )}
-            </button>
-          </div>
-        }
       />
 
-      {/* ===== تبويب مراجعة رسائل الاستفسار ===== */}
-      {mainTab === 'inquiry_review' && (
-        <InquiryReviewTab
-          messages={filteredInquiryMessages}
-          allMessages={inquiryMessages}
-          filter={inquiryFilter}
-          setFilter={setInquiryFilter}
-          search={inquirySearch}
-          setSearch={setInquirySearch}
-          onModerate={handleModerateInquiry}
-          onDelete={(id) => setConfirmDeleteMsg(id)}
-          pendingCount={pendingInquiryCount}
-        />
-      )}
-
-      {/* ===== تبويب تذاكر الدعم ===== */}
-      {mainTab === 'tickets' && (
-        <>
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
@@ -584,32 +492,6 @@ export default function AdminMessages() {
           )}
         </div>
       </div>
-        </>
-      )}
-
-      {/* نافذة تأكيد اعتراض/حذف رسالة استفسار */}
-      <Modal open={confirmDeleteMsg !== null} onClose={() => setConfirmDeleteMsg(null)} title="اعتراض وحذف رسالة">
-        <div className="space-y-4 text-right" dir="rtl">
-          <div className="flex items-start gap-3 p-3 bg-rose-50 border border-rose-200 rounded-xl">
-            <ShieldAlert className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-cairo font-bold text-sm text-rose-800">اعتراض على رسالة</p>
-              <p className="text-xs text-rose-600 font-tajawal mt-1 leading-relaxed">
-                سيتم حذف هذه الرسالة نهائياً من محادثة العضو. لا يمكن التراجع عن هذا الإجراء. تأكد من أن الرسالة تخالف الشروط قبل الحذف.
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={() => setConfirmDeleteMsg(null)} className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-600 font-cairo font-bold text-sm hover:bg-slate-200 transition-colors">
-              إلغاء
-            </button>
-            <button onClick={handleDeleteInquiry} className="flex-1 py-3 rounded-xl bg-rose-600 text-white font-cairo font-bold text-sm hover:bg-rose-700 transition-colors flex items-center justify-center gap-1.5">
-              <Trash2 className="w-4 h-4" /> نعم، احذف الرسالة
-            </button>
-          </div>
-        </div>
-      </Modal>
-
       {/* Member profile modal */}
       <Modal open={!!selectedMember} onClose={() => setSelectedMember(null)} title="تفاصيل وبيانات العضو الحساسة" size="lg">
         {selectedMember && <MemberDetailsView member={selectedMember} />}
@@ -750,203 +632,6 @@ function MemberDetailsView({ member }: { member: AdminMember }) {
           <h4 className="font-cairo font-bold text-slate-900 text-xs mb-1">مواصفات الشريك:</h4>
           <p className="text-xs text-slate-600 font-tajawal leading-relaxed">{member.aboutPartner || 'لم يحدد.'}</p>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ====================================================================
-//  تبويب مراجعة رسائل الاستفسار
-// ====================================================================
-function InquiryReviewTab({
-  messages,
-  allMessages,
-  filter,
-  setFilter,
-  search,
-  setSearch,
-  onModerate,
-  onDelete,
-  pendingCount,
-}: {
-  messages: (InquiryMessage & { request_id: number })[];
-  allMessages: (InquiryMessage & { request_id: number })[];
-  filter: 'pending' | 'approved' | 'rejected' | 'all';
-  setFilter: (f: 'pending' | 'approved' | 'rejected' | 'all') => void;
-  search: string;
-  setSearch: (s: string) => void;
-  onModerate: (id: number, action: 'approve' | 'reject') => void;
-  onDelete: (id: number) => void;
-  pendingCount: number;
-}) {
-  const stats = {
-    total: allMessages.length,
-    pending: allMessages.filter(m => !m.approved && !m.rejected).length,
-    approved: allMessages.filter(m => m.approved).length,
-    rejected: allMessages.filter(m => m.rejected).length,
-  };
-
-  const getSenderInfo = (senderId: string) => {
-    if (senderId === 'admin') return { name: 'الإدارة', isDeleted: false, isBanned: false, isSuspended: false };
-    const m = getLiveMemberById(senderId);
-    const isDeleted = !m || m.status === 'deleted' || (m as any)?.deleted === true;
-    const isBanned = m?.status === 'banned';
-    const isSuspended = m?.status === 'suspended';
-    const nickname = m?.nickname || senderId;
-    return { name: isDeleted ? `${nickname} (حساب مُحذوف)` : nickname, isDeleted, isBanned, isSuspended };
-  };
-
-  return (
-    <div className="space-y-5">
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: 'إجمالي الرسائل', value: stats.total, color: 'bg-slate-100 text-slate-700', icon: MessageSquare },
-          { label: 'بانتظار المراجعة', value: stats.pending, color: 'bg-rose-100 text-rose-700', icon: Clock },
-          { label: 'موافق عليها', value: stats.approved, color: 'bg-emerald-100 text-emerald-700', icon: CheckCircle2 },
-          { label: 'مرفوضة', value: stats.rejected, color: 'bg-amber-100 text-amber-700', icon: XCircle },
-        ].map((s) => (
-          <div key={s.label} className="bg-white rounded-2xl p-3 shadow-sm border border-slate-200/80 text-center">
-            <div className={`w-8 h-8 rounded-lg mx-auto flex items-center justify-center mb-1.5 ${s.color}`}>
-              <s.icon className="w-4 h-4" />
-            </div>
-            <div className="font-cairo font-black text-lg text-slate-950">{s.value}</div>
-            <div className="text-[10px] text-slate-500 font-tajawal">{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
-        <div className="relative">
-          <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="ابحث في نص الرسائل..."
-            className="w-full pr-12 pl-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-amber-400 focus:outline-none font-tajawal text-slate-900"
-          />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <FilterDropdown
-            label="الحالة:"
-            value={filter}
-            onChange={(v) => setFilter(v as typeof filter)}
-            options={[
-              { value: 'pending', label: 'بانتظار المراجعة', count: stats.pending },
-              { value: 'approved', label: 'موافق عليها', count: stats.approved },
-              { value: 'rejected', label: 'مرفوضة', count: stats.rejected },
-              { value: 'all', label: 'كل الرسائل', count: stats.total },
-            ]}
-          />
-        </div>
-      </div>
-
-      {/* Messages list */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        {messages.length === 0 ? (
-          <div className="py-16 text-center">
-            <Inbox className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-sm text-slate-400 font-cairo">
-              {filter === 'pending' ? 'لا توجد رسائل بانتظار المراجعة 🎉' : 'لا توجد رسائل مطابقة'}
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-50">
-            {messages.map((msg) => {
-              const senderInfo = getSenderInfo(msg.sender_id);
-              const isPending = !msg.approved && !msg.rejected;
-              return (
-                <div key={msg.id} className={`p-4 hover:bg-slate-50 transition-colors ${isPending ? 'bg-rose-50/30' : ''}`}>
-                  <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold flex-shrink-0 ${msg.sender_id === 'admin' ? 'bg-slate-500' : senderInfo.isDeleted ? 'bg-rose-600' : 'bg-navy-900'}`}>
-                      {senderInfo.name.charAt(0)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className="font-cairo font-bold text-sm text-slate-900">{senderInfo.name}</span>
-                        {senderInfo.isDeleted && (
-                          <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 text-[9px] font-cairo font-bold border border-rose-300">
-                            ⚠️ حساب مُحذوف
-                          </span>
-                        )}
-                        {senderInfo.isBanned && (
-                          <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 text-[9px] font-cairo font-bold border border-rose-200">
-                            ⛔ محظور
-                          </span>
-                        )}
-                        {senderInfo.isSuspended && (
-                          <span className="px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 text-[9px] font-cairo font-bold border border-orange-200">
-                            ⚠️ موقوف
-                          </span>
-                        )}
-                        {(() => {
-                          const reqObj = dataService.db.getRequest(msg.request_id);
-                          const isImp = reqObj?.source_type === 'imported';
-                          const num = reqObj?.request_number || msg.request_id;
-                          return (
-                            <span className={`text-[10px] font-tajawal font-bold px-1.5 py-0.5 rounded ${isImp ? 'bg-purple-50 text-purple-700' : 'bg-blue-50 text-blue-700'}`}>
-                              طلب {isImp ? 'مستوردين' : 'مسجلين'} #{num}
-                            </span>
-                          );
-                        })()}
-                        {isPending && (
-                          <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 text-[9px] font-cairo font-bold flex items-center gap-1">
-                            <Clock className="w-2.5 h-2.5" /> بانتظار المراجعة
-                          </span>
-                        )}
-                        {msg.approved && (
-                          <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[9px] font-cairo font-bold flex items-center gap-1">
-                            <CheckCircle2 className="w-2.5 h-2.5" /> موافق عليها
-                          </span>
-                        )}
-                        {msg.rejected && (
-                          <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[9px] font-cairo font-bold flex items-center gap-1">
-                            <XCircle className="w-2.5 h-2.5" /> مرفوضة
-                          </span>
-                        )}
-                      </div>
-                      <div className="bg-slate-50 rounded-xl p-3 mb-2">
-                        <p className="text-sm text-slate-800 font-tajawal leading-relaxed">{msg.text}</p>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-slate-400 font-tajawal">
-                          {new Date(msg.created_at).toLocaleString('ar-SA')}
-                          {msg.moderated_by && ` · راجعها: ${msg.moderated_by}`}
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          {isPending && (
-                            <>
-                              <button
-                                onClick={() => onModerate(msg.id, 'approve')}
-                                className="px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-xs font-cairo font-bold transition-colors flex items-center gap-1"
-                              >
-                                <CheckCircle2 className="w-3.5 h-3.5" /> موافقة
-                              </button>
-                              <button
-                                onClick={() => onModerate(msg.id, 'reject')}
-                                className="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 text-xs font-cairo font-bold transition-colors flex items-center gap-1"
-                              >
-                                <XCircle className="w-3.5 h-3.5" /> رفض
-                              </button>
-                            </>
-                          )}
-                          <button
-                            onClick={() => onDelete(msg.id)}
-                            className="px-3 py-1.5 rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200 text-xs font-cairo font-bold transition-colors flex items-center gap-1"
-                            title="اعتراض وحذف الرسالة نهائياً"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" /> اعتراض وحذف
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
     </div>
   );

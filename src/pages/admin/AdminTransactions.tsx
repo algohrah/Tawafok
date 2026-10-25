@@ -11,6 +11,9 @@ const getTransactions = () => dataService.db.getTransactions();
 
 /** اعتماد أو رفض معاملة معلّقة (دفع يدوي بنكي/عملات رقمية) — يُفعّل الامتياز الفعلي عند الاعتماد عبر الخادم */
 async function reviewTransaction(id: string | number, approve: boolean): Promise<{ ok: boolean; error?: string }> {
+  if (approve && getTransactions().find((tx: any) => String(tx.id) === String(id))?.type === 'inquiry') {
+    return { ok: false, error: 'هذه معاملة لخدمة ملغاة؛ راجعها ماليًا دون تفعيل رصيد جديد.' };
+  }
   const targetStatus = approve ? 'completed' : 'failed';
   try {
     const { data: { session } } = await authClient.auth.getSession();
@@ -54,7 +57,7 @@ const methodConfig: Record<string, string> = {
 const typeConfig: Record<string, { label: string; icon: React.ElementType; color: string }> = {
   subscription: { label: 'اشتراك', icon: CreditCard, color: 'text-purple-600' },
   deposit: { label: 'رسوم جدية', icon: ShieldCheck, color: 'text-amber-600' },
-  inquiry: { label: 'باقة استفسار', icon: MessageSquare, color: 'text-sky-600' },
+  inquiry: { label: 'خدمة ملغاة — سجل سابق', icon: MessageSquare, color: 'text-sky-600' },
   final: { label: 'رسوم سعي', icon: Gem, color: 'text-emerald-600' },
   exemption: { label: 'إعفاء/وسام', icon: Gift, color: 'text-blue-600' },
   coupon: { label: 'كوبون', icon: Tag, color: 'text-rose-600' },
@@ -266,7 +269,7 @@ export default function AdminTransactions() {
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => handleReview(t.id, true)}
-                          disabled={isReviewing}
+                          disabled={isReviewing || t.type === 'inquiry'}
                           aria-label="اعتماد المعاملة"
                           className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 flex items-center justify-center transition-colors disabled:opacity-50"
                         >
@@ -322,7 +325,7 @@ export default function AdminTransactions() {
                 <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
                   <button
                     onClick={() => handleReview(t.id, true)}
-                    disabled={reviewingId === t.id}
+                    disabled={reviewingId === t.id || t.type === 'inquiry'}
                     className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-emerald-100 text-emerald-700 hover:bg-emerald-200 font-cairo font-bold text-xs transition-colors disabled:opacity-50"
                   >
                     {reviewingId === t.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} اعتماد

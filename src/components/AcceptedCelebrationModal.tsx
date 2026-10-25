@@ -1,11 +1,10 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { HeartHandshake, ShieldCheck, Sparkles, MessageSquare, ChevronLeft } from 'lucide-react';
-import { INQUIRY_PACKAGE_PRICE } from '../lib/journey';
+import { HeartHandshake, ShieldCheck, Sparkles, ChevronLeft } from 'lucide-react';
 import { useSettings } from '../lib/useSettings';
 
 // ============================================================
 //  بطاقة احتفالية تظهر فور الضغط على «قبول»
-//  خياران واضحان: سداد رسوم الجدية / استفسار أولاً
+//  الخطوة التالية: سداد رسوم الجدية
 // ============================================================
 
 interface Props {
@@ -13,12 +12,11 @@ interface Props {
   memberName: string;
   onClose: () => void;
   onProceed: () => void;       // سداد رسوم الجدية
-  onInquiry: () => void;       // فتح غرفة الاستفسار
   onOpenJourney: () => void;   // فتح الرحلة الكاملة (اختياري)
 }
 
 export default function AcceptedCelebrationModal({
-  open, memberName, onClose, onProceed, onInquiry,
+  open, memberName, onClose, onProceed,
 }: Props) {
   const { settings } = useSettings();
   return (
@@ -63,7 +61,7 @@ export default function AcceptedCelebrationModal({
               </p>
             </div>
 
-            {/* خياران واضحان */}
+            {/* الخطوة التالية */}
             <div className="p-5">
               <p className="text-center text-[11px] font-cairo font-bold text-navy-400 mb-3">
                 ما هي خطوتك التالية؟
@@ -84,21 +82,6 @@ export default function AcceptedCelebrationModal({
                   </p>
                 </div>
                 <ChevronLeft className="w-5 h-5 text-navy-900/60 flex-shrink-0" />
-              </button>
-
-              {/* الخيار الثانوي: استفسار أولاً */}
-              <button
-                onClick={onInquiry}
-                className="w-full mt-2.5 bg-white border-2 border-amber-200 hover:border-amber-300 rounded-2xl p-4 flex items-center gap-3 transition-all hover:-translate-y-0.5 shadow-soft text-right"
-              >
-                <div className="w-12 h-12 rounded-2xl bg-amber-500 flex items-center justify-center text-white flex-shrink-0">
-                  <MessageSquare className="w-6 h-6" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-cairo font-extrabold text-navy-800">استفسار أولاً</h4>
-                  <p className="text-xs text-navy-500 font-cairo">تعرّف أكثر عبر المحادثة قبل الدفع · {INQUIRY_PACKAGE_PRICE} ريال</p>
-                </div>
-                <ChevronLeft className="w-5 h-5 text-amber-400 flex-shrink-0" />
               </button>
 
               <button

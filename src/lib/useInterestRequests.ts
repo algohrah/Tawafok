@@ -186,7 +186,7 @@ export async function runActionStandalone(requestId: number, action: string, act
   return runRequestAction(requestId, action, actorId, payload);
 }
 
-// محاكاة ردّ الطرف الآخر داخل غرفة الاستفسار (للتجربة)
+// توافق قديم: يعيد رفضًا دائمًا ولا يولّد ردًا.
 export async function simulateInquiryReply(requestId: number, replierId: string, text: string) {
   return simulateReply(requestId, replierId, text);
 }

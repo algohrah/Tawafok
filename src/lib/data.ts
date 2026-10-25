@@ -1,4 +1,4 @@
-import type { Plan, Notification, SupportTicket, MessagePackage } from './types';
+import type { Plan, Notification, SupportTicket } from './types';
 import { MEMBERS, getMemberById } from './members';
 
 // إعادة تصدير الأعضاء والدوال للتوافق مع باقي الصفحات
@@ -8,20 +8,14 @@ export type { Member } from './members';
 export const PLANS: Plan[] = [
   { id: 'free', name: 'مجاني', price: 0, period: 'للأبد',
     description: 'ابدأ بالبحث الأساسي وأرسل طلبات التوافق عبر المنصة.',
-    features: ['5 طلبات توافق يوميًا', 'فلاتر الجنس والدولة والعمر والمدينة', 'المفضلة واستقبال الطلبات والإشعارات', 'رسائل الاستفسار تُشترى بصورة مستقلة'],
+    features: ['5 طلبات توافق يوميًا', 'فلاتر الجنس والدولة والعمر والمدينة', 'المفضلة واستقبال الطلبات والإشعارات'],
     color: 'navy', messagesLimit: 0, requestsLimit: 5, searchLimit: 999,
     showContactLimit: 0, durationDays: 30, advancedFilters: false },
   { id: 'featured', name: 'توافق مميز', price: 99, period: '30 يومًا',
     description: 'فلاتر كاملة وطلبات أكثر وتمييز واضح لملفك.',
-    features: ['20 طلب توافق يوميًا', 'جميع فلاتر البحث، بما فيها البحث بالرمز أو الاسم', 'شارة توافق مميز وقسم الأعضاء المميزون', 'أولوية ظهور بين الملفات المتقاربة في التوافق', 'رسائل الاستفسار تُشترى بصورة مستقلة ولا يشملها الاشتراك'],
+    features: ['20 طلب توافق يوميًا', 'جميع فلاتر البحث، بما فيها البحث بالرمز أو الاسم', 'شارة توافق مميز وقسم الأعضاء المميزون', 'أولوية ظهور بين الملفات المتقاربة في التوافق'],
     popular: true, color: 'gold', messagesLimit: 0, requestsLimit: 20, searchLimit: 999,
     showContactLimit: 0, durationDays: 30, advancedFilters: true },
-];
-
-export const DEFAULT_MESSAGE_PACKAGES: MessagePackage[] = [
-  { id: 'small', name: 'الباقة الصغرى (٤ رسائل)', credits: 4, price: 29 },
-  { id: 'medium', name: 'الباقة المتوسطة (١٠ رسائل)', credits: 10, price: 50 },
-  { id: 'large', name: 'الباقة الكبرى (٢٥ رسالة)', credits: 25, price: 100 },
 ];
 
 // ===== تذاكر الدعم (التواصل مع الإدارة) =====
@@ -35,7 +29,7 @@ export const SUPPORT_TICKETS: SupportTicket[] = [
     updatedAt: 'قبل ساعتين',
     messages: [
       { id: '1', sender: 'user', text: 'السلام عليكم، أود الاستفسار عن مزايا توافق مميز بالتفصيل', time: '10:00 ص' },
-      { id: '2', sender: 'admin', text: 'وعليكم السلام، أهلًا بك. توافق مميز يمنحك 20 طلب توافق يوميًا وفلاتر متقدمة وشارة مميزة وأولوية ظهور تراعي التوافق. الرسائل ورسوم الرحلة مستقلة. هل ترغب بالترقية الآن؟', time: '10:15 ص' },
+      { id: '2', sender: 'admin', text: 'وعليكم السلام، أهلًا بك. توافق مميز يمنحك 20 طلب توافق يوميًا وفلاتر متقدمة وشارة مميزة وأولوية ظهور تراعي التوافق. رسوم الرحلة مستقلة عن العضوية. هل ترغب بالترقية الآن؟', time: '10:15 ص' },
       { id: '3', sender: 'user', text: 'شكرًا لكم على الشرح الوافي 🌹', time: '10:20 ص' },
     ],
   },

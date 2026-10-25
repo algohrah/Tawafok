@@ -104,7 +104,7 @@
 .home-journey-number { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .home-page .home-journey-step p { color: var(--home-muted); margin-top: 8px; font-size: 16px; }
 .home-page .home-notice { padding: 16px 20px; background: var(--home-soft); border-inline-start: 3px solid #bf7e22; color: var(--home-muted); font-size: 15px; margin-top: 16px; }
-.home-service-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.home-service-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .home-service { padding: 24px 20px; border: 1px solid var(--home-border); border-radius: 16px; background: var(--home-surface); }
 .home-service-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 20px; }
 .home-service-number { color: var(--home-muted); font-size: 14px; }
@@ -157,7 +157,7 @@
   .home-journey-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
   .home-page .home-journey-step h3 { font-size: 18px; }
   .home-page .home-journey-step p { font-size: 15px; }
-  .home-service-grid { gap: 12px; }
+  .home-service-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .home-service { padding: 20px 16px; }
   .home-service-top { align-items: flex-start; gap: 4px; flex-direction: column; margin-bottom: 12px; }
   .home-privacy-grid, .home-faq-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }

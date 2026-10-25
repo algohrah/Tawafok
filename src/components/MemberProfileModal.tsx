@@ -26,12 +26,7 @@ interface MemberProfileModalProps {
   onClose: () => void;
 }
 
-const MESSAGE_TEMPLATES = [
-  'السلام عليكم ورحمة الله، لفت انتباهي توافق ملفنا وأتمنى التوفيق لنا.',
-  'مرحبًا، أرى توافقًا في القيم والأهداف وأرغب بالتوافق الجاد للزواج بإذن الله.',
-  'السلام عليكم، ملفك أعجبني وأبحث عن شريك بصفات مشابهة، أتمنى التواصل.',
-  'تحية طيبة، لاحظت توافقًا في المواصفات وأرغب في التقدم عبر الإدارة.',
-];
+
 
 export default function MemberProfileModal({ member, open, onClose }: MemberProfileModalProps) {
   const navigate = useNavigate();
@@ -42,7 +37,6 @@ export default function MemberProfileModal({ member, open, onClose }: MemberProf
   } = useApp();
 
   const [contactOpen, setContactOpen] = useState(false);
-  const [contactMsg, setContactMsg] = useState('');
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [sending, setSending] = useState(false);
@@ -193,12 +187,11 @@ export default function MemberProfileModal({ member, open, onClose }: MemberProf
     }
     setSending(true);
     try {
-      const msg = contactMsg || 'طلب توافق جديد للزواج عبر المنصة';
+      const msg = 'طلب توافق جديد عبر المنصة';
       const res = await sendInterestRequest(member.id, msg);
       if (res?.ok) {
         incrementUsage('message');
         setContactOpen(false);
-        setContactMsg('');
         showToast('تم إرسال طلب التوافق. يمكنك متابعة حالته الآن.', 'success');
         onClose();
         navigate(`/journey/${res.data.id}`);
@@ -815,50 +808,7 @@ export default function MemberProfileModal({ member, open, onClose }: MemberProf
                   </div>
                 )}
 
-                {/* اختيار قالب رسالة سريع */}
-                <div className="space-y-1.5">
-                  <span className="text-xs font-cairo font-bold text-navy-800 dark:text-cream-100 flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-amber-600" />
-                    <span>اختر قالباً جاهزاً للرسالة أو اكتب نصك الخاص:</span>
-                  </span>
-                  <div className="grid grid-cols-1 gap-1.5 max-h-36 overflow-y-auto pr-1">
-                    {(isImported
-                      ? [
-                          'السلام عليكم ورحمة الله، اطلعت على هذا الملف المرفوع عبر الإدارة، وأرغب في التقدم وطلب توافق للتواصل مع الطرف الآخر/الخطابة لبحث التوافق.',
-                          'السلام عليكم، أرغب في التقدّم الجاد لطلب التوافق مع هذا الملف المبارك عبر وساطة المنصة.',
-                          'تحية طيبة، أرجو تزويدي بمزيد من التفاصيل حول هذا الملف لبحث التوافق الشرعي والتنسيق مع الخطابة.',
-                        ]
-                      : MESSAGE_TEMPLATES
-                    ).map((tpl, i) => (
-                      <button
-                        key={`modal-contact-tpl-${i}`}
-                        type="button"
-                        onClick={() => setContactMsg(tpl)}
-                        className={`text-right text-xs font-tajawal p-2.5 rounded-xl border transition-all cursor-pointer leading-relaxed ${
-                          contactMsg === tpl
-                            ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-400 dark:border-amber-600 text-amber-950 dark:text-amber-200 font-bold shadow-xs'
-                            : 'bg-cream-50 dark:bg-navy-800/60 border-cream-200 dark:border-navy-700 text-navy-800 dark:text-cream-100 hover:bg-cream-100 dark:hover:bg-navy-800'
-                        }`}
-                      >
-                        {tpl}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* حقل كتابة الرسالة المخصصة */}
-                <div className="space-y-1">
-                  <label className="text-xs font-cairo font-semibold text-slate-700 dark:text-slate-300">
-                    نص الرسالة أو الملاحظات:
-                  </label>
-                  <textarea
-                    value={contactMsg}
-                    onChange={(e) => setContactMsg(e.target.value)}
-                    rows={3}
-                    placeholder={isImported ? 'اكتب ملاحظاتك أو تفاصيل طلب التوفيق للإدارة...' : 'اكتب رسالة اهتمام مخصصة للشريك...'}
-                    className="w-full px-3.5 py-2.5 rounded-2xl bg-cream-50 dark:bg-navy-950 border border-cream-300 dark:border-navy-700 font-tajawal text-xs sm:text-sm focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 dark:text-cream-50 transition-all"
-                  />
-                </div>
+                <p className="text-xs font-tajawal text-navy-600 dark:text-cream-200">يُرسل طلب توافق دون رسالة مرفقة. للاستفسارات تواصل مع الإدارة.</p>
               </div>
 
               {/* أزرار الإجراءات السفلية في النافذة المنبثقة */}

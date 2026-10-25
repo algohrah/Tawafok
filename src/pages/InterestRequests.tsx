@@ -473,11 +473,6 @@ export default function InterestRequests() {
         open={!!acceptModal}
         memberName={acceptModal?.name || ''}
         onClose={() => setAcceptModal(null)}
-        onInquiry={() => {
-          const r = acceptModal?.req;
-          setAcceptModal(null);
-          if (r) navigate(`/journey/${r.id}?tab=inquiry`);
-        }}
         onOpenJourney={() => {
           const r = acceptModal?.req;
           setAcceptModal(null);
@@ -932,20 +927,6 @@ function RequestCard({
           </div>
         </div>
       </div>
-
-      {req.message && (
-        <div className="px-4 sm:px-6 pb-4">
-          <div className="relative bg-amber-50/40 dark:bg-amber-950/10 border border-amber-200/40 dark:border-amber-900/20 rounded-2xl p-4 shadow-inner">
-            <div className="absolute right-3.5 -top-2.5 bg-white dark:bg-navy-950 px-2.5 py-0.5 rounded-full border border-amber-200/50 dark:border-amber-900/40 text-[9px] font-bold text-amber-800 dark:text-amber-400 font-cairo flex items-center gap-1">
-              <Sparkles className="w-2.5 h-2.5 text-amber-500" />
-              {isSender ? 'رسالتك المرفقة مع الطلب' : 'رسالة الطرف الآخر لك'}
-            </div>
-            <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 font-cairo leading-relaxed italic">
-              " {req.message} "
-            </p>
-          </div>
-        </div>
-      )}
 
       <div className="px-4 sm:px-6 pb-4">
         <RequestStatusPanel summary={summary} compact />

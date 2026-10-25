@@ -12,7 +12,7 @@ import {
 // ===== مراحل الرحلة (المسار الرئيسي) =====
 export type JourneyStage =
   | 'sent'           // ① مُرسَل — وصل الطلب للطرف الآخر بانتظار رده
-  | 'accepted'       // ② مقبول — (استفسار اختياري + رسوم الجدية في صفحة واحدة)
+  | 'accepted'       // ② مقبول — رسوم الجدية
   | 'seriousness'    // ③ العربون — سداد ٥٠٠ ريال من كل طرف
   | 'coordination'   // ④ التواصل — يشارك كل طرف بياناته باختياره
   | 'sharia_viewing' // ⑤ نتيجة النظرة الشرعية — قرار مستقل من كل طرف
@@ -181,7 +181,7 @@ export function requiresMyAction(
     case 'sent':
       return role === 'receiver';            // طلب وارد ينتظر ردّي
     case 'accepted':
-      return true;                            // عليّ اختيار استفسار/رسوم جدية
+      return true;                            // عليّ سداد رسوم الجدية
     case 'seriousness':
       return !ctx.selfPaid;                   // لم أدفع بعد
     case 'sharia_viewing':
@@ -425,12 +425,9 @@ export function getJourneyStatusSummary(
   };
 }
 
-// ===== رسوم السعي وباقة الاستفسار =====
+// ===== رسوم السعي =====
 export const DEPOSIT_AMOUNT = 500;
 export const FINAL_FEE_AMOUNT = 2000;
-export const INQUIRY_PACKAGE_PRICE = 100;   // سعر باقة الاستفسار
-export const INQUIRY_PACKAGE_CREDITS = 20;   // عدد رسائل الباقة
-export const INQUIRY_LOW_CREDITS = 3;        // عتبة التحذير
 
 // ===== أسباب الاعتذار الجاهزة =====
 export const DECLINE_REASONS = [
@@ -445,7 +442,7 @@ export const DECLINE_REASONS = [
 // ===== أسباب إلغاء الطلب الجاهزة =====
 export const CANCEL_REASONS = [
   'لم يعد لدي رغبة في إكمال هذا الطلب.',
-  'تبيّن عدم التوافق بعد الاستفسار.',
+  'تبيّن عدم التوافق بعد مراجعة التفاصيل.',
   'ظروف خاصة طرأت.',
   'سبب آخر.',
 ];

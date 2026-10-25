@@ -376,7 +376,6 @@ export default function AdminImportedCoordination() {
     setNewMessageText('');
 
     try {
-      await dataService.db.initializeInquiry(reqId, recipientId);
       await dataService.db.sendInquiry(reqId, 'admin', textToSend);
       showToast(`تم إرسال الرسالة وإشعار المتقدم (${currentParties?.registered?.nickname || 'المسجل'}) بنجاح ✓`, 'success');
     } catch (err: any) {

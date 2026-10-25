@@ -98,7 +98,6 @@ function TargetPartySelector({
 
 const tabs = [
   { id: 'journeys' as const, label: 'الرحلات', icon: Heart },
-  { id: 'moderation' as const, label: 'مراجعة الرسائل', icon: ShieldCheck },
   { id: 'archive' as const, label: 'الأرشيف', icon: Clock },
 ];
 
@@ -107,10 +106,9 @@ export default function AdminRequests() {
     moveToStage, delayStage, freezeRequest, unfreezeRequest, reactivateRequest, swapParty, members: adminMembers,
     adminSetPayments, adminSetPledges, adminSetViewingResults, adminSetContacts } =
     useAdminRequests();
-  const { interestRequests, adminModeratePreExchangeMessage, members, showToast, impersonateUser, currentAdminName } = useApp();
-  const { markReviewed: markMsgReviewed, getMark: getMsgMark } = useReviewMarkers('twafok_moderated_messages');
+  const { showToast, impersonateUser, currentAdminName } = useApp();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'journeys' | 'moderation' | 'archive'>('journeys');
+  const [activeTab, setActiveTab] = useState<'journeys' | 'archive'>('journeys');
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [filter, setFilter] = useState<JourneyState | 'all'>('all');
   const [sourceFilter, setSourceFilter] = useState<'all' | 'registered' | 'imported'>('all');
@@ -125,7 +123,6 @@ export default function AdminRequests() {
   const [detailPayments, setDetailPayments] = useState<{ items: Array<{ payer: string, type: string, label: string, at: string, amount: number }>; total: number }>({ items: [], total: 0 });
   const [confirmDelete, setConfirmDelete] = useState<{ id: string | number } | null>(null);
   const [localToast, setLocalToast] = useState<string | null>(null);
-  const [inquiryRefreshKey, setInquiryRefreshKey] = useState(0);
 
   // ===== حالة الإجراءات الجماعية والتحديد الإداري =====
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -370,59 +367,6 @@ export default function AdminRequests() {
 
   // ⚠️ يجب أن تبقى كل الـ hooks (بما فيها useMemo) قبل أي return مشروط
   // لتجنّب خطأ React #310 (ترتيب الـ hooks غير الثابت).
-  const messagesList = useMemo(() => {
-    const list: Array<{ requestId: string; messageId: string; sender: { id?: string, nickname?: string, realName?: string, name?: string, status?: string, deleted?: boolean, gender?: string } | undefined | null; receiver: { id?: string, nickname?: string, realName?: string, name?: string, status?: string, deleted?: boolean, gender?: string } | undefined | null; text: string; time: string; approved?: boolean; rejected?: boolean; isInquiry: boolean }> = [];
-
-    // 1. جلب رسائل الاستفسار الفعلية الجديدة من مخزن البيانات المحلي
-    try {
-      const allInquiries = dataService.db.getAllInquiryMessages();
-      allInquiries.forEach((msg: { request_id: string; sender_id: string; id: string; text: string; created_at: string; approved?: boolean; rejected?: boolean }) => {
-        const req = requests.find((r) => r.id === msg.request_id);
-        const sender = getMember(msg.sender_id);
-        const receiverId = req ? (req.sender_id === msg.sender_id ? req.receiver_id : req.sender_id) : '';
-        const receiver = getMember(receiverId);
-
-        list.push({
-          requestId: msg.request_id,
-          messageId: msg.id,
-          sender,
-          receiver,
-          text: msg.text,
-          time: new Date(msg.created_at).toLocaleString('ar-SA'),
-          approved: msg.approved,
-          rejected: msg.rejected,
-          isInquiry: true,
-        });
-      });
-    } catch (e) {
-      console.error(e);
-    }
-
-    // 2. تجميع الرسائل القديمة للتوافق الرجعي التام
-    interestRequests.forEach((req: { id: string; senderId?: string; receiverId?: string; chatMessages?: Array<{ senderId: string; id: string; text: string; time: string; approved?: boolean; rejected?: boolean }> }) => {
-      if (req.chatMessages && req.chatMessages.length > 0) {
-        req.chatMessages.forEach((msg: { senderId: string; id: string; text: string; time: string; approved?: boolean; rejected?: boolean }) => {
-          const sender = members.find((m) => m.id === msg.senderId);
-          const receiverId = req.senderId === msg.senderId ? req.receiverId : req.senderId;
-          const receiver = members.find((m) => m.id === receiverId);
-          list.push({
-            requestId: req.id,
-            messageId: msg.id,
-            sender,
-            receiver,
-            text: msg.text,
-            time: msg.time,
-            approved: msg.approved,
-            rejected: msg.rejected,
-            isInquiry: false,
-          });
-        });
-      }
-    });
-
-    return list;
-  }, [requests, getMember, interestRequests, members, inquiryRefreshKey]);
-
   if (error && requests.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -489,7 +433,7 @@ export default function AdminRequests() {
         })}
       </div>
 
-      {activeTab !== 'moderation' && (
+      {true && (
         <div className="space-y-3">
           <div className="flex flex-col sm:flex-row gap-2">
             <div className="relative flex-1">
@@ -610,7 +554,7 @@ export default function AdminRequests() {
         </div>
       )}
 
-      {activeTab !== 'moderation' && (
+      {true && (
         <div className="space-y-3 relative">
           {filtered.length === 0 && (
             <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center">
@@ -963,35 +907,6 @@ export default function AdminRequests() {
         </div>
       )}
 
-      {activeTab === 'moderation' && (
-        <ModerationPanel
-          messagesList={messagesList}
-          getMark={getMsgMark}
-          onApprove={(requestId, messageId) => {
-            markMsgReviewed(`${requestId}-${messageId}`, currentAdminName);
-            const msgItem = messagesList.find(m => m.requestId === requestId && m.messageId === messageId);
-            if (msgItem?.isInquiry) {
-              dataService.db.moderateInquiryMessage(Number(messageId), 'approve', currentAdminName);
-              setInquiryRefreshKey(prev => prev + 1);
-            } else {
-              adminModeratePreExchangeMessage(requestId, messageId, 'approve');
-            }
-            showToast('تم قبول الرسالة وتوصيلها', 'success');
-          }}
-          onReject={(requestId, messageId) => {
-            markMsgReviewed(`${requestId}-${messageId}`, currentAdminName);
-            const msgItem = messagesList.find(m => m.requestId === requestId && m.messageId === messageId);
-            if (msgItem?.isInquiry) {
-              dataService.db.moderateInquiryMessage(Number(messageId), 'reject', currentAdminName);
-              setInquiryRefreshKey(prev => prev + 1);
-            } else {
-              adminModeratePreExchangeMessage(requestId, messageId, 'reject');
-            }
-            showToast('تم رفض الرسالة وحجبها', 'info');
-          }}
-        />
-      )}
-
       <Modal
         open={!!detailReq}
         onClose={() => setDetailReq(null)}
@@ -1157,7 +1072,7 @@ export default function AdminRequests() {
                         <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
                           {detailPayments.items.map((p, i) => {
                             const payer = p.payer === 'الطرفان' ? 'الطرفان' : (getMember(p.payer)?.nickname || p.payer);
-                            const typeColor = p.type === 'deposit' ? 'text-amber-600' : p.type === 'inquiry' ? 'text-sky-600' : 'text-emerald-600';
+                            const typeColor = p.type === 'deposit' ? 'text-amber-600' : p.type === 'inquiry' ? 'text-slate-500' : 'text-emerald-600';
                             return (
                               <div key={i} className="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-slate-200 last:border-0">
                                 <div className="min-w-0">
@@ -2078,126 +1993,6 @@ function PartyChip({ member, role }: { member: { id?: string, nickname?: string,
           )}
         </div>
         <p className="text-[10px] text-slate-400 font-cairo">{role}</p>
-      </div>
-    </div>
-  );
-}
-
-function ModerationPanel({
-  messagesList,
-  onApprove,
-  onReject,
-  getMark,
-}: {
-  messagesList: Array<{ requestId: string; messageId: string; sender: { id?: string, nickname?: string, realName?: string, name?: string, status?: string, deleted?: boolean, gender?: string } | undefined | null; receiver: { id?: string, nickname?: string, realName?: string, name?: string, status?: string, deleted?: boolean, gender?: string } | undefined | null; text: string; time: string; approved?: boolean; rejected?: boolean; isInquiry: boolean }>;
-  onApprove: (requestId: string, messageId: string) => void;
-  onReject: (requestId: string, messageId: string) => void;
-  getMark: (id: string) => { reviewedAt: string; reviewedBy: string } | null;
-}) {
-  const [modFilter, setModFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
-
-  const pending = messagesList.filter((m) => !m.approved && !m.rejected);
-  const approved = messagesList.filter((m) => m.approved);
-  const rejected = messagesList.filter((m) => m.rejected);
-
-  const visible = messagesList.filter((m) => {
-    if (modFilter === 'pending') return !m.approved && !m.rejected;
-    if (modFilter === 'approved') return m.approved;
-    if (modFilter === 'rejected') return m.rejected;
-    return true;
-  });
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-amber-900 text-xs leading-relaxed font-tajawal flex items-start gap-2">
-        <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-        <div>
-          <strong>ملاحظة هامة للمشرفين 🛡️:</strong> يرجى مراجعة كافة الرسائل بدقة. الموافقة فقط على الرسائل الجادة والمحترمة التي لا تحتوي على وسائل تواصل خارجية.
-        </div>
-      </div>
-
-      {/* عدّادات قابلة للنقر كفلاتر */}
-      <div className="grid grid-cols-4 gap-3">
-        {([
-          { key: 'all' as const, label: 'الكل', value: messagesList.length, color: 'text-slate-700' },
-          { key: 'pending' as const, label: 'بانتظار المراجعة', value: pending.length, color: 'text-amber-600' },
-          { key: 'approved' as const, label: 'المقبولة', value: approved.length, color: 'text-emerald-600' },
-          { key: 'rejected' as const, label: 'المرفوضة', value: rejected.length, color: 'text-rose-600' },
-        ]).map((s) => (
-          <button
-            key={s.key}
-            onClick={() => setModFilter(s.key)}
-            className={`bg-white rounded-2xl p-4 shadow-sm border text-center transition-all ${
-              modFilter === s.key ? 'border-amber-400 ring-1 ring-amber-200' : 'border-slate-200 hover:border-slate-300'
-            }`}
-          >
-            <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
-            <p className="text-[11px] text-slate-500 font-cairo">{s.label}</p>
-          </button>
-        ))}
-      </div>
-
-      <div className="space-y-4">
-        {visible.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-2xl border border-slate-200">
-            <MessageSquare className="w-12 h-12 text-slate-300 mx-auto mb-2" />
-            <p className="text-slate-500 font-tajawal text-sm">لا توجد رسائل مطابقة حالياً.</p>
-          </div>
-        ) : (
-          visible.map((msg, idx) => {
-            const mark = getMark(`${msg.requestId}-${msg.messageId}`);
-            return (
-              <div key={idx} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 space-y-4">
-                <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3 flex-wrap">
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-400 font-tajawal">المرسل</span>
-                      <span className="block text-sm font-bold text-slate-900">{msg.sender?.nickname || 'عضو مجهول'}</span>
-                    </div>
-                    <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-xs font-bold">←</div>
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-400 font-tajawal">المستقبل</span>
-                      <span className="block text-sm font-bold text-slate-900">{msg.receiver?.nickname || 'عضو مجهول'}</span>
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-slate-400 font-tajawal">{msg.time}</span>
-                </div>
-
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-sm text-slate-800 font-tajawal leading-relaxed">
-                  "{msg.text}"
-                </div>
-
-                {!msg.approved && !msg.rejected ? (
-                  <div className="flex gap-2.5 justify-end">
-                    <button
-                      onClick={() => onApprove(msg.requestId, msg.messageId)}
-                      className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-cairo font-bold transition-colors flex items-center gap-1.5 shadow-sm"
-                    >
-                      <CheckCircle2 className="w-4 h-4" /> قبول وتوصيل
-                    </button>
-                    <button
-                      onClick={() => onReject(msg.requestId, msg.messageId)}
-                      className="px-5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-cairo font-bold border border-rose-100 transition-colors flex items-center gap-1.5"
-                    >
-                      <XCircle className="w-4 h-4" /> رفض وحجب
-                    </button>
-                  </div>
-                ) : (
-                  <div className={`flex items-center justify-between gap-2 flex-wrap rounded-xl px-3 py-2 ${msg.approved ? 'bg-emerald-50 border border-emerald-100' : 'bg-rose-50 border border-rose-100'}`}>
-                    <span className={`flex items-center gap-1.5 text-xs font-bold font-cairo ${msg.approved ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {msg.approved ? <><CheckCircle2 className="w-4 h-4" /> تمت الموافقة عليها</> : <><Ban className="w-4 h-4" /> تم رفضها وحجبها</>}
-                    </span>
-                    {mark && (
-                      <span className="text-[10px] text-slate-500 font-cairo">
-                        بواسطة {mark.reviewedBy} · {new Date(mark.reviewedAt).toLocaleString('ar-SA')}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })
-        )}
       </div>
     </div>
   );

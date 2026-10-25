@@ -7,7 +7,7 @@ export default function Plans() {
     <header className="bg-navy-gradient px-4 py-12 text-center text-white">
       <span className="inline-flex rounded-full bg-white/10 px-4 py-1.5 text-sm font-cairo">عضوية تناسب استخدامك</span>
       <h1 className="mt-4 text-3xl sm:text-4xl font-cairo font-extrabold">مجاني أو توافق مميز</h1>
-      <p className="mt-3 text-cream-200 font-tajawal">خياران واضحان، والرسائل ورسوم رحلة التوافق مستقلة عن العضوية.</p>
+      <p className="mt-3 text-cream-200 font-tajawal">خياران واضحان، ورسوم رحلة التوافق مستقلة عن العضوية.</p>
     </header>
     <main className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
       <div className="grid gap-6 md:grid-cols-2">
@@ -22,8 +22,8 @@ export default function Plans() {
         </section>)}
       </div>
       <section className="mt-6 rounded-2xl border border-sky-200 bg-sky-50 p-5">
-        <h2 className="flex items-center gap-2 font-cairo font-bold text-navy-900"><MessageSquare className="h-5 w-5"/> الرسائل ليست ضمن العضوية</h2>
-        <p className="mt-2 text-sm font-tajawal text-navy-700">رسائل الاستفسار تُشترى من داخل غرفة التوافق. اشتراك توافق مميز لا يمنح رسائل مجانية ولا يغيّر رصيدك الحالي.</p>
+        <h2 className="flex items-center gap-2 font-cairo font-bold text-navy-900"><MessageSquare className="h-5 w-5"/> رسوم الرحلة مستقلة عن العضوية</h2>
+        <p className="mt-2 text-sm font-tajawal text-navy-700">اشتراك توافق مميز يمنح مزايا البحث والطلبات وتمييز الملف. رسوم الجدية وأتعاب رحلة التوافق مستقلة، وتُراجع شروطها قبل السداد.</p>
       </section>
       <p className="mt-5 text-sm font-tajawal text-navy-600">رسوم رحلة التوافق منفصلة تمامًا؛ العضوية لا تعفي منها ولا تخصم منها.</p>
       <Link to="/search" className="mt-5 inline-flex gap-2 items-center text-sm font-cairo font-bold text-gold-700">تصفّح الأعضاء <ArrowLeft className="h-4 w-4"/></Link>

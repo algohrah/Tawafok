@@ -23,12 +23,7 @@ import { getCurrentUserId, createInterestRequest, useInterestRequests } from '..
 import { normalizeNationality } from '../lib/data/optionNormalizer';
 import WhatsAppShareModal from '../components/WhatsAppShareModal';
 
-const MESSAGE_TEMPLATES = [
-  'السلام عليكم ورحمة الله، لفت انتباهي توافق ملفنا وأتمنى التوفيق لنا.',
-  'مرحبًا، أرى توافقًا في القيم والأهداف وأرغب بالتوافق الجاد للزواج بإذن الله.',
-  'السلام عليكم، ملفك أعجبني وأبحث عن شريك بصفات مشابهة، أتمنى التواصل.',
-  'تحية طيبة، لاحظت توافقًا في المواصفات وأرغب في التقدم عبر الإدارة.',
-];
+
 
 // ===== Collapsible Section Component =====
 function CollapsibleSection({
@@ -140,7 +135,6 @@ export default function MemberProfile() {
   }, [id, username, members, adminMembers]);
 
   const [contactOpen, setContactOpen] = useState(false);
-  const [contactMsg, setContactMsg] = useState('');
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
@@ -1003,7 +997,7 @@ export default function MemberProfile() {
               <span>بدء رحلة التوافق للزواج</span>
             </div>
             <p className="text-xs text-slate-700 font-tajawal leading-relaxed">
-              سيتم إرسال طلبك مباشرة إلى <strong>{member.nickname}</strong> بانتظار قبوله المبدئي. بعد القبول، تنتقل الرحلة تلقائياً لمرحلة تأكيد الجدية والتواصل المباشر.
+              سيتم إرسال طلبك مباشرة إلى <strong>{member.nickname}</strong> بانتظار قبوله المبدئي. بعد القبول، تنتقل الرحلة تلقائياً لمرحلة تأكيد الجدية ثم تنسيق التواصل.
             </p>
             <div className="pt-2 border-t border-amber-200/60 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-tajawal text-slate-700">
               <div className="flex items-center gap-1.5">
@@ -1017,45 +1011,16 @@ export default function MemberProfile() {
             </div>
           </div>
 
-          {/* Templates */}
-          <div>
-            <label className="block text-xs font-cairo font-bold text-slate-800 mb-2">💬 رسالة الاهتمام المرفقة بالطلب</label>
-            <div className="space-y-1.5">
-              {MESSAGE_TEMPLATES.map((tpl, i) => (
-                <button
-                  key={`profile-msg-tpl-${i}`}
-                  onClick={() => setContactMsg(tpl)}
-                  className={`w-full text-right p-2.5 rounded-xl border-2 text-xs font-tajawal leading-relaxed transition-all ${
-                    contactMsg === tpl
-                      ? 'border-amber-500 bg-amber-50 text-slate-900 shadow-sm font-semibold'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-amber-300'
-                  }`}
-                >
-                  {tpl}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <textarea
-              value={contactMsg}
-              onChange={(e) => setContactMsg(e.target.value)}
-              rows={2}
-              placeholder="اكتب رسالة اهتمام مخصصة أو اختر من القوالب أعلاه..."
-              className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border-2 border-slate-200 focus:border-amber-500 focus:outline-none font-tajawal text-sm resize-none transition-colors"
-            />
-          </div>
+          <p className="text-xs font-tajawal text-slate-600">يُرسل طلب توافق دون رسالة مرفقة. للاستفسارات تواصل مع الإدارة.</p>
 
           <div className="flex flex-col gap-2 pt-2">
             <button
               onClick={async () => {
-                const msg = contactMsg || 'طلب توافق جديد للزواج عبر المنصة';
+                const msg = 'طلب توافق جديد عبر المنصة';
                 const res = await sendInterestRequest(member.id, msg);
                 if (res?.ok) {
                   incrementUsage('message');
                   setContactOpen(false);
-                  setContactMsg('');
                   showToast('تم إرسال طلب التوافق. يمكنك متابعة حالته الآن.', 'success');
                   setTimeout(() => navigate(`/journey/${res.data.id}`), 450);
                 } else {

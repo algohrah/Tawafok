@@ -97,8 +97,8 @@ interface AuthUser {
   profile: UserProfile;
 }
 
-import { PLANS as DEFAULT_PLANS, SUPPORT_TICKETS as DEFAULT_TICKETS, DEFAULT_MESSAGE_PACKAGES } from './data';
-import type { Plan, SupportTicket, InterestPurchaseSettings, MemberReport, AdminUser, AdminPermissions, MessagePackage } from './types';
+import { PLANS as DEFAULT_PLANS, SUPPORT_TICKETS as DEFAULT_TICKETS } from './data';
+import type { Plan, SupportTicket, InterestPurchaseSettings, MemberReport, AdminUser, AdminPermissions } from './types';
 import { calculateCompatibility, type CompatResult } from './compatibility';
 import { getNationalityForCountry } from './registrationOptions';
 
@@ -211,8 +211,6 @@ interface AppContextType {
   unlimitedInterestsUntil: number;
   setUnlimitedInterestsUntil: React.Dispatch<React.SetStateAction<number>>;
   buyExtraInterests: () => void;
-  messagePackages: MessagePackage[];
-  updateMessagePackage: (updated: MessagePackage) => void;
 
   // Real-Time Stateful Collections & Admin integrations
   members: Member[];
@@ -264,16 +262,11 @@ interface AppContextType {
   adminUpdateInterestRequestDetails: (id: string, fields: Partial<InterestRequest>) => void;
   adminCancelAndRefund: (requestId: string, type: 'full' | 'partial') => void;
   adminProcessExemptRequest: (id: string, action: 'approve' | 'reject') => void;
-  adminModeratePreExchangeMessage: (requestId: string, messageId: string, action: 'approve' | 'reject') => void;
   
   // Exemption system
   exemptRequests: ExemptRequest[];
   submitExemptRequest: (requestId: string, reason: string) => void;
   payInterestRequestFee: (requestId: string, isSender: boolean, pledgeAccepted: boolean) => void;
-  payPreExchangeChatFee: (requestId: string, isSender: boolean) => void;
-  sendPreExchangeChatMessage: (requestId: string, text: string, isSender: boolean) => void;
-  flagPreExchangeNoMoney: (requestId: string, isSender: boolean) => void;
-  choosePreExchangeOption: (requestId: string, choice: 'chat' | 'direct_deposit' | null) => void;
 
   calculateCompat: (m1: Member, m2: Member) => number;
   calculateCompatDetailed: (target: Member) => CompatResult;
@@ -967,9 +960,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const savedPurchase = dataService.db.settings.get('interest_purchase_settings');
         if (savedPurchase) setInterestPurchaseSettings(JSON.parse(savedPurchase));
 
-        const savedPackages = dataService.db.settings.get('saved_message_packages');
-        if (savedPackages) setMessagePackages(JSON.parse(savedPackages));
-
         const savedTickets = dataService.db.settings.get('saved_support_tickets_list');
         if (savedTickets) setSupportTickets(JSON.parse(savedTickets));
 
@@ -1112,34 +1102,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       dataService.db.settings.set('interest_purchase_settings', JSON.stringify(settings));
     }
   }, []);
-
-  const [messagePackages, setMessagePackages] = useState<MessagePackage[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = dataService.db.settings.get('saved_message_packages');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length === 3) {
-            return parsed;
-          }
-        } catch {
-          // fallback
-        }
-      }
-    }
-    return DEFAULT_MESSAGE_PACKAGES;
-  });
-
-  const updateMessagePackage = useCallback((updated: MessagePackage) => {
-    setMessagePackages((prev) => {
-      const next = prev.map((p) => (p.id === updated.id ? updated : p));
-      if (typeof window !== 'undefined') {
-        dataService.db.settings.set('saved_message_packages', JSON.stringify(next));
-      }
-      return next;
-    });
-    showToast(`تم تحديث باقة رسائل ${updated.name} بنجاح!`, 'success');
-  }, [showToast]);
 
   const [extraInterestsCount, setExtraInterestsCount] = useState<number>(() => {
     if (typeof window !== 'undefined') {
@@ -2189,80 +2151,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     showToast('تم تأكيد جديتك وسداد رسوم خدمة الوساطة بنجاح ✓', 'success');
   }, [showToast]);
 
-  const payPreExchangeChatFee = useCallback((requestId: string, isSender: boolean) => {
-    // الدفع المباشر عبر بوابة الدفع — يفتح المحادثة بعد إتمام الدفع
-    setInterestRequests(prev => prev.map(req => {
-      if (req.id === requestId) {
-        return {
-          ...req,
-          ...(isSender ? {
-            senderChatUnlocked: true,
-            senderNoMoney: false,
-          } : {
-            receiverChatUnlocked: true,
-            receiverNoMoney: false,
-          })
-        };
-      }
-      return req;
-    }));
-  }, []);
-
-  const sendPreExchangeChatMessage = useCallback((requestId: string, text: string, isSender: boolean) => {
-    if (!text.trim()) return;
-
-    setInterestRequests(prev => prev.map(req => {
-      if (req.id === requestId) {
-        const newMsg = {
-          id: 'chat_' + Date.now() + Math.random().toString(36).substring(2, 6),
-          senderId: isSender ? req.senderId : req.receiverId,
-          text: text.trim(),
-          time: 'الآن',
-          approved: false, // Messages are unapproved by default and require admin review
-          rejected: false,
-        };
-
-        return {
-          ...req,
-          chatMessages: [...(req.chatMessages || []), newMsg],
-          ...(isSender ? {
-            senderChatUnlocked: true,
-          } : {
-            receiverChatUnlocked: true,
-          })
-        };
-      }
-      return req;
-    }));
-    showToast('تم إرسال رسالتك بنجاح. الرسالة قيد المراجعة والتدقيق من قبل الإدارة والوسيط الأخصائي لضمان الجدية والخصوصية الكاملة 🛡️', 'info');
-  }, [user, showToast]);
-
-  const flagPreExchangeNoMoney = useCallback((requestId: string, isSender: boolean) => {
-    setInterestRequests(prev => prev.map(req => {
-      if (req.id === requestId) {
-        return {
-          ...req,
-          ...(isSender ? { senderNoMoney: true } : { receiverNoMoney: true })
-        };
-      }
-      return req;
-    }));
-    showToast('تم إرسال إشعار للطرف الآخر بعدم إمكانية الشحن حالياً.', 'info');
-  }, [showToast]);
-
-  const choosePreExchangeOption = useCallback((requestId: string, choice: 'chat' | 'direct_deposit' | null) => {
-    setInterestRequests(prev => prev.map(req => {
-      if (req.id === requestId) {
-        return {
-          ...req,
-          preExchangeChoice: choice,
-        };
-      }
-      return req;
-    }));
-    showToast(choice === 'chat' ? 'تم اختيار الاستفسار المبكر قبل تبادل الأرقام.' : 'تم اختيار الانتقال المباشر لتبادل الأرقام وسداد رسوم الجدية.', 'info');
-  }, [showToast]);
-
   const adminCancelAndRefund = useCallback((requestId: string, type: 'full' | 'partial') => {
     setInterestRequests(prev => prev.map(req => {
       if (req.id === requestId) {
@@ -2877,7 +2765,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const targetPlan = plans.find((p) => p.id === plan);
     if (userId) {
       dataService.db.adminUpdateMember(userId, { plan, premium: plan === 'featured' });
-      // Inquiry messages are purchased independently; membership grants no credits.
+      // Membership benefits are independent of journey fees.
       // تسجيل المعاملة المالية في جدول transactions الحقيقي
       fetch('/api/transactions', {
         method: 'POST',
@@ -3017,13 +2905,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // MICROTRANSACTIONS LOGIC (buying 20 messages pack or 1 contact pack)
   const buyMicrotransaction = useCallback((type: 'messages_20' | 'contact_1', cost: number) => {
+    if (type === 'messages_20') {
+      showToast('هذه الخدمة غير متاحة. تواصل مع الإدارة للمساعدة.', 'info');
+      return;
+    }
     // subtract usage offset so user gets more tokens allowed or just deduct from usage counter
     setUsage((prev) => {
       const next = { ...prev };
-      if (type === 'messages_20') {
-        // give breathing room of 20 more messages
-        next.messagesSent = Math.max(0, next.messagesSent - 20);
-      } else if (type === 'contact_1') {
+      if (type === 'contact_1') {
         // give breathing room of 1 more contact
         next.contactsViewed = Math.max(0, next.contactsViewed - 1);
       }
@@ -3041,9 +2930,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
 
     showToast(
-      type === 'messages_20'
-        ? `🎉 تم شراء حزمة (20 رسالة إضافية) وتفعيلها بنجاح!`
-        : `🎉 تم تفعيل رؤية رقم تواصل لحساب إضافي بنجاح!`,
+      `🎉 تم تفعيل رؤية رقم تواصل لحساب إضافي بنجاح!`,
       'success'
     );
   }, [showToast]);
@@ -3392,31 +3279,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     showToast('تم حفظ تحديثات طلب الاهتمام والموعد بنجاح بنظام التوفيق والمطابقة ✓', 'success');
   }, [showToast]);
 
-  const adminModeratePreExchangeMessage = useCallback((requestId: string, messageId: string, action: 'approve' | 'reject') => {
-    setInterestRequests((prevRequests) => {
-      return prevRequests.map((req) => {
-        if (req.id === requestId) {
-          const updatedMessages = (req.chatMessages || []).map((msg: any) => {
-            if (msg.id === messageId) {
-              return {
-                ...msg,
-                approved: action === 'approve',
-                rejected: action === 'reject',
-              };
-            }
-            return msg;
-          });
-          return {
-            ...req,
-            chatMessages: updatedMessages,
-          };
-        }
-        return req;
-      });
-    });
-    showToast(action === 'approve' ? 'تمت الموافقة على الرسالة وتوصيلها للطرف الآخر ✓' : 'تم رفض وتصفية الرسالة لمخالفتها شروط المنصة ❌', 'info');
-  }, [showToast]);
-
   const sendInterestRequest = useCallback(async (memberId: string, messageText: string) => {
     const activeUserId = user.isLoggedIn ? (user.memberId || dataService.db.getCurrentUserId()) : null;
     const isAdminImpersonating = typeof window !== 'undefined' && dataService.db.settings.get('impersonating') === 'true';
@@ -3465,7 +3327,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { ok: false, error: 'لديك طلب نشط لدى هذا العضو بالفعل' };
     }
 
-    const res = await dataService.db.createRequest(activeUserId, memberId, messageText.trim() || 'طلب توافق مرسل عبر الإدارة');
+    const res = await dataService.db.createRequest(activeUserId, memberId, 'طلب توافق جديد عبر المنصة');
     await refreshDailyQuota();
     if (res && res.ok) {
       showToast('تم إرسال طلب الاهتمام بنجاح! 💌', 'success');
@@ -3592,8 +3454,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         unlimitedInterestsUntil,
         setUnlimitedInterestsUntil,
         buyExtraInterests,
-        messagePackages,
-        updateMessagePackage,
         members: activeMembers,
         membersLoading: !isInitialized,
         membersError,
@@ -3632,14 +3492,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         adminUpdateInterestRequestDetails,
         adminCancelAndRefund,
         adminProcessExemptRequest,
-        adminModeratePreExchangeMessage,
         exemptRequests,
         submitExemptRequest,
         payInterestRequestFee,
-        payPreExchangeChatFee,
-        sendPreExchangeChatMessage,
-        flagPreExchangeNoMoney,
-        choosePreExchangeOption,
         calculateCompat,
         calculateCompatDetailed,
         sendInterestRequest,

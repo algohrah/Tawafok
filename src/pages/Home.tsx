@@ -23,7 +23,7 @@ const overviewSteps = [
 const journeySteps = [
   { icon: Send, title: 'طلب التوافق', description: 'اختر الملف المناسب وأرسل طلبك.' },
   { icon: HeartHandshake, title: 'الموافقة المبدئية', description: 'يمكن للطرف الآخر قبول الطلب أو الاعتذار عنه.' },
-  { icon: ShieldCheck, title: 'الاستفسار وتأكيد الجدية', description: 'استفسار اختياري بباقة مستقلة، ثم سداد رسوم الجدية المطلوبة للمتابعة.' },
+  { icon: ShieldCheck, title: 'تأكيد الجدية', description: 'بعد الموافقة المبدئية، يسدّد كل طرف رسوم الجدية المطلوبة لمتابعة التنسيق.' },
   { icon: CalendarClock, title: 'تنسيق التواصل', description: 'تُحدّد الخطوات بحسب نوع الملف، وتُشارك وسائل التواصل بموافقة الأطراف.' },
   { icon: Users, title: 'النظرة وقرار الطرفين', description: 'يحدّد كل طرف رغبته في الاستمرار أو الاعتذار بعد النظرة الشرعية.' },
   { icon: CheckCircle2, title: 'استكمال الرحلة', description: 'عند اتفاق الطرفين، تُتابع الإجراءات والأتعاب المستحقة وفق الشروط.' },
@@ -31,14 +31,13 @@ const journeySteps = [
 
 const serviceOptions = [
   { number: '01', title: 'الحساب والبحث الأساسي', label: 'مجاني', description: 'أنشئ ملفك، وابحث بحسب الجنس والدولة والمدينة والعمر، وأرسل طلبات ضمن حدود الحساب.' },
-  { number: '02', title: 'توافق مميز', label: 'عضوية اختيارية', description: 'فلاتر بحث إضافية، وحد أعلى للطلبات، وتمييز لملفك. لا تشمل العضوية رسائل الاستفسار أو رسوم الرحلة.' },
-  { number: '03', title: 'رسائل الاستفسار', label: 'باقة مستقلة', description: 'تُشترى من داخل رحلة التوافق عند الرغبة في الاستفسار. رصيد الرسائل منفصل عن العضوية.' },
-  { number: '04', title: 'رسوم رحلة التوافق', label: 'بحسب المرحلة', description: 'رسوم جدية وأتعاب لاحقة وفق شروط الرحلة. راجع المبلغ والضريبة وشروط الاسترداد قبل السداد.' },
+  { number: '02', title: 'توافق مميز', label: 'عضوية اختيارية', description: 'فلاتر بحث إضافية، وحد أعلى للطلبات، وتمييز لملفك. لا تشمل العضوية رسوم رحلة التوافق.' },
+  { number: '03', title: 'رسوم رحلة التوافق', label: 'بحسب المرحلة', description: 'رسوم جدية وأتعاب لاحقة وفق شروط الرحلة. راجع المبلغ والضريبة وشروط الاسترداد قبل السداد.' },
 ];
 
 const faqs = [
   { question: 'هل أحتاج إلى اشتراك لأبدأ؟', answer: 'لا. التسجيل والبحث الأساسي متاحان مجانًا، ويمكنك إرسال طلبات توافق ضمن حدود الحساب. توافق مميز عضوية اختيارية لمزايا إضافية، وليس شرطًا لبدء البحث.' },
-  { question: 'هل العضوية المميزة تشمل الرسائل ورسوم الرحلة؟', answer: 'لا. العضوية المميزة ورسائل الاستفسار ورسوم رحلة التوافق خدمات مستقلة. راجع تفاصيل كل خدمة والمبلغ المعروض قبل الشراء أو السداد.' },
+  { question: 'هل العضوية المميزة تشمل رسوم الرحلة؟', answer: 'لا. العضوية المميزة ورسوم رحلة التوافق خدمتان مستقلتان. راجع تفاصيل كل خدمة والمبلغ المعروض قبل الشراء أو السداد.' },
   { question: 'ما الفرق بين العضو المسجّل وملف الوساطة؟', answer: 'العضو المسجّل لديه حساب يتابع منه طلباته. أما ملف الوساطة فتضيفه الإدارة، وتتولى التنسيق بشأنه مع الخطابة أو الجهة المعنية؛ ولا يعني ظهوره أن صاحبه يستخدم حسابًا نشطًا على المنصة.' },
   { question: 'هل جميع الملفات موثّقة؟', answer: 'لا. شارة التوثيق منفصلة عن العضوية المميزة ووسام الجدية. وجود إحدى هذه الشارات لا يعني وجود الشارات الأخرى، ولا يضمن صحة كل معلومة أو نجاح التوافق.' },
   { question: 'ما المعلومات الظاهرة؟ ومتى تُشارك وسائل التواصل؟', answer: 'تُعرض معلومات الملف ومواصفات الشريك للمتصفحين. وفي رحلة الأعضاء المسجّلين يكتب كل طرف وسائل التواصل التي يختار مشاركتها ويؤكد إرسالها. أما ملفات الوساطة فيتولى الفريق التنسيق بشأنها. لا تضع أرقامًا أو بيانات حساسة في النبذة العامة.' },
@@ -123,7 +122,7 @@ export default function Home() {
               <Link className="home-button home-button-gold" to={isLoggedIn ? '/search' : '/register'}>{isLoggedIn ? 'تصفّح الملفات' : 'إنشاء حساب مجاني'}<ArrowLeft aria-hidden="true" size={18} /></Link>
               <Link className="home-button home-button-light" to={isLoggedIn ? '/profile' : '/search'}>{isLoggedIn ? 'ملفي الشخصي' : 'تصفّح الملفات'}</Link>
             </div>
-            <p className="home-free-note">التسجيل والبحث الأساسي مجانيان. الاشتراك والرسائل ورسوم الرحلة منفصلة.</p>
+            <p className="home-free-note">التسجيل والبحث الأساسي مجانيان. الاشتراك ورسوم الرحلة منفصلان.</p>
             <Link className="home-text-link home-link-light" to="/#home-fees" onClick={(event) => scrollToSection(event, 'home-fees')}>ما هو مجاني وما هو مدفوع؟<ArrowLeft aria-hidden="true" size={16} /></Link>
           </div>
 
@@ -174,7 +173,7 @@ export default function Home() {
 
       <section tabIndex={-1} id="home-fees" className="home-section home-section-soft" aria-labelledby="home-fees-title">
         <div className="home-container">
-          <div className="home-section-heading"><div><p className="home-eyebrow">وضوح قبل الالتزام</p><h2 id="home-fees-title">اعرف ما هو مجاني وما هو مدفوع</h2><p>أربع خدمات واضحة. الاشتراك في إحداها لا يعني شمول الخدمات الأخرى.</p></div></div>
+          <div className="home-section-heading"><div><p className="home-eyebrow">وضوح قبل الالتزام</p><h2 id="home-fees-title">اعرف ما هو مجاني وما هو مدفوع</h2><p>خدمات واضحة. الاشتراك في إحداها لا يعني شمول الخدمات الأخرى.</p></div></div>
           <div className="home-service-grid">{serviceOptions.map((option) => <article key={option.title} className="home-service"><div className="home-service-top"><span className="home-service-number">{option.number}</span><span className="home-service-label">{option.label}</span></div><h3>{option.title}</h3><p>{option.description}</p></article>)}</div>
           <div className="home-fees-footer"><p>تُراجع الأسعار والشروط في صفحة الخدمة وعند السداد، لا من ملخص الرئيسية.</p><Link className="home-text-link" to="/plans">تفاصيل العضوية<ArrowLeft aria-hidden="true" size={16} /></Link><Link className="home-text-link" to="/legal/terms">الشروط والأحكام<ArrowLeft aria-hidden="true" size={16} /></Link></div>
         </div>

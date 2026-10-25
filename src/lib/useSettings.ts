@@ -9,9 +9,6 @@ import { dataService } from './data/DataService';
 export interface JourneySettings {
   deposit_amount: number;
   final_fee_amount: number;
-  inquiry_package_price: number;
-  inquiry_package_credits: number;
-  inquiry_low_credits: number;
   payment_deadline_days: number;
   free_attempts_after_deposit: number;
   new_request_cooldown_days: number;
@@ -22,9 +19,6 @@ export interface JourneySettings {
 export const DEFAULT_SETTINGS: JourneySettings = {
   deposit_amount: 500,
   final_fee_amount: 2000,
-  inquiry_package_price: 100,
-  inquiry_package_credits: 20,
-  inquiry_low_credits: 3,
   payment_deadline_days: 15,
   free_attempts_after_deposit: 5,
   new_request_cooldown_days: 30,

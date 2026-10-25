@@ -642,8 +642,8 @@ export default function Checkout() {
               {/* Limits and inclusions preview */}
               <div className="bg-slate-50 rounded-xl p-3 mb-4 border border-slate-100 space-y-2 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">رسائل الاستفسار:</span>
-                  <span className="font-bold text-slate-800">الرسائل تُشترى مستقلة — لا رصيد مضمّن</span>
+                  <span className="text-slate-500">رسوم الرحلة:</span>
+                  <span className="font-bold text-slate-800">مستقلة عن الاشتراك</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">طلبات التوافق المتاحة:</span>

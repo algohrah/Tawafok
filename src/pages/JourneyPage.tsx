@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowRight, Loader2, AlertCircle, BadgeCheck, MapPin, Check, Info, X,
@@ -10,10 +10,10 @@ import {
 import { getAvatar, getGenderColors } from '../lib/types';
 import { useApp } from '../lib/AppContext';
 import {
-  fetchRequest, fetchRequestEvents, fetchInquiry, buyInquiryPackage, sendInquiryMessage, initializeInquiryPackage,
-  fetchMembers, runActionStandalone, simulateInquiryReply, markRequestSeen,
-  markRequestNotificationsRead, getCurrentUserId, buyMessagePackageCustom,
-  updateInquiryMessage, deleteInquiryMessage, type ApiRequest, type RequestEvent, type InquiryState,
+  fetchRequest, fetchRequestEvents, fetchInquiry,
+  fetchMembers, runActionStandalone, markRequestSeen,
+  markRequestNotificationsRead, getCurrentUserId,
+  type ApiRequest, type RequestEvent, type InquiryState,
 } from '../lib/useInterestRequests';
 import { useSettings } from '../lib/useSettings';
 import {
@@ -35,9 +35,6 @@ export default function JourneyPage() {
   const navigate = useNavigate();
   const { user } = useApp();
   const currentUserId = user?.memberId || getCurrentUserId();
-  const [searchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab'); // 'inquiry' | 'deposit'
-
   // تعليم الطلب كمقروء عند فتح رحلته
   useEffect(() => {
     if (rid && currentUserId) {
@@ -67,7 +64,6 @@ export default function JourneyPage() {
       setLoading(false);
       return;
     }
-    await initializeInquiryPackage(rid, currentUserId);
     const [r, ev, inq, mem] = await Promise.all([
       fetchRequest(rid),
       fetchRequestEvents(rid),
@@ -168,7 +164,7 @@ export default function JourneyPage() {
         <div className="sticky top-0 z-50 bg-rose-600 text-white px-4 py-3 text-center font-cairo font-bold text-sm flex items-center justify-center gap-2 shadow-md">
           <AlertTriangle className="w-5 h-5 flex-shrink-0 animate-bounce" />
           <span>
-            {isOtherDeleted ? 'تنبيه: تم حذف حساب الطرف الآخر من المنصة، لا يمكن استكمال المراسلات أو خطوات الرحلة.' : isOtherBanned ? 'تنبيه: حساب الطرف الآخر محظور حالياً من قبل الإدارة.' : 'تنبيه: حساب الطرف الآخر موقوف موقتاً.'}
+            {isOtherDeleted ? 'تنبيه: تم حذف حساب الطرف الآخر من المنصة، لا يمكن استكمال خطوات الرحلة.' : isOtherBanned ? 'تنبيه: حساب الطرف الآخر محظور حالياً من قبل الإدارة.' : 'تنبيه: حساب الطرف الآخر موقوف موقتاً.'}
           </span>
         </div>
       )}
@@ -258,8 +254,8 @@ export default function JourneyPage() {
           <ActiveStagePanel
             req={req} stage={stage} isSender={isSender} other={other} busy={busy}
             self={members.find((m) => m.id === currentUserId)}
-            inquiry={inquiry} setInquiry={setInquiry} reload={load} showToast={showToast}
-            runAction={runAction} initialTab={initialTab}
+            showToast={showToast}
+            runAction={runAction}
           />
         </div>
 
@@ -343,7 +339,7 @@ export default function JourneyPage() {
 //  الطبقة 2 — لوحة المرحلة النشطة (تتغيّر حسب المرحلة)
 // ============================================================
 function ActiveStagePanel({
-  req, stage, isSender, other, self, busy, inquiry, setInquiry, reload, showToast, runAction, initialTab,
+  req, stage, isSender, other, self, busy, showToast, runAction,
 }: any) {
   const meta = STAGE_META[stage as JourneyState];
   const c = ACCENT_CLASSES[meta.accent];
@@ -381,9 +377,9 @@ function ActiveStagePanel({
     return null;
   }
 
-  // المرحلة: مقبول أو تأكيد الجدية -> مركز الخطوة التالية لكلا الطرفين (الاستفسار والرسوم) طالما لم يكتمل سداد الطرفين معاً للانتقال لمرحلة التنسيق
+  // المرحلة: مقبول أو تأكيد الجدية -> سداد رسوم الجدية لكلا الطرفين طالما لم يكتمل سداد الطرفين معاً للانتقال لمرحلة التنسيق
   if (stage === 'accepted' || stage === 'seriousness') {
-    return <AcceptedHub req={req} other={other} busy={busy} inquiry={inquiry} setInquiry={setInquiry} reload={reload} showToast={showToast} runAction={runAction} initialTab={initialTab} />;
+    return <DepositInline req={req} busy={busy} runAction={runAction} showToast={showToast} />;
   }
 
   // تبادل أرقام التواصل (التنسيق)
@@ -506,7 +502,7 @@ function ActiveStagePanel({
           
           {req.evaluation_note && (
             <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-3.5 text-xs font-cairo text-navy-700 leading-relaxed text-right">
-              <strong>📝 رسالة المباركة والتوثيق من الطرفين:</strong> {req.evaluation_note}
+              <strong>📝 ملاحظة استكمال الرحلة:</strong> {req.evaluation_note}
             </div>
           )}
         </div>
@@ -852,531 +848,6 @@ function HeroCard({ meta, c, Icon, children }: any) {
   );
 }
 
-// ============================================================
-//  مركز "مقبول" — الاستفسار + العربون في صفحة واحدة
-// ============================================================
-// ============================================================
-//  مركز "مقبول" — الاستفسار + العربون في صفحة واحدة
-// ============================================================
-function AcceptedHub({ req, other, busy, inquiry, setInquiry, reload, showToast, runAction, initialTab }: any) {
-  const { user } = useApp();
-  const currentUserId = user?.memberId || getCurrentUserId();
-  const isSender = req.sender_id === currentUserId;
-  const selfPaid = isSender ? req.sender_paid : req.receiver_paid;
-
-  // إذا كان العضو قد سدّد بالفعل، نفتح له المحادثة تلقائياً كخيار افتراضي لتسهيل الرد والمتابعة
-  const defaultTab = initialTab
-    ? (initialTab === 'inquiry' ? 'inquiry' : 'deposit')
-    : (selfPaid ? 'inquiry' : 'deposit');
-
-  const [tab, setTab] = useState<'choose' | 'inquiry' | 'deposit'>(defaultTab);
-  const [cancelOpen, setCancelOpen] = useState(false);
-
-  // الكشف عن رسائل واردة غير مقروءة للوسم المرئي
-  const hasMessages = inquiry?.messages && inquiry.messages.length > 0;
-  const lastMsg = hasMessages ? inquiry.messages[inquiry.messages.length - 1] : null;
-  const hasUnreadInquiry = lastMsg && lastMsg.sender_id !== 'admin' && lastMsg.sender_id !== currentUserId;
-
-  return (
-    <div className="rounded-3xl bg-white border border-cream-200 shadow-soft overflow-hidden">
-      <div className="bg-emerald-50 border-b border-emerald-200 px-5 py-4 flex items-center gap-3">
-        <div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center text-white">
-          <Check className="w-6 h-6" />
-        </div>
-        <div className="flex-1">
-          <span className="text-[11px] font-cairo font-bold text-navy-400">تم القبول ✓</span>
-          <h2 className="font-cairo font-extrabold text-lg text-emerald-700">ما هي خطوتك التالية؟</h2>
-        </div>
-      </div>
-
-      {/* تبويبات الاختيار مع شرح بسيط */}
-      <div className="flex gap-2.5 p-3.5 bg-slate-50/50 border-b border-cream-100">
-        <button onClick={() => setTab('deposit')}
-          className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-2xl font-cairo font-extrabold text-xs sm:text-sm transition-all duration-300 border cursor-pointer
-            ${tab === 'deposit' 
-              ? 'bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 border-amber-400 shadow-[0_4px_12px_rgba(245,158,11,0.2)]' 
-              : 'bg-white border-cream-200 text-navy-500 hover:border-amber-300'}`}>
-          <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-current" /> سداد العربون</span>
-          <span className={`text-[9px] font-bold ${tab === 'deposit' ? 'text-navy-950/80' : 'text-navy-400'}`}>
-            {selfPaid ? 'تم تأكيد جديتك بنجاح ✓' : 'الطريق المباشر للتوافق للزواج'}
-          </span>
-        </button>
-        <button onClick={() => setTab('inquiry')}
-          className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-2xl font-cairo font-extrabold text-xs sm:text-sm transition-all duration-300 border cursor-pointer relative
-            ${tab === 'inquiry' 
-              ? 'bg-slate-900 text-white border-slate-900 shadow-[0_4px_12px_rgba(15,23,42,0.15)]' 
-              : 'bg-white border-cream-200 text-navy-500 hover:border-amber-300'}`}>
-          {hasUnreadInquiry && tab !== 'inquiry' && (
-            <span className="absolute top-2 right-2 flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-            </span>
-          )}
-          <span className="flex items-center gap-1.5"><MessageSquare className="w-4 h-4 text-current" /> استفسار أولاً</span>
-          <span className={`text-[9px] font-bold ${tab === 'inquiry' ? 'text-amber-400' : 'text-navy-400'}`}>تعرّف أكثر قبل الدفع</span>
-        </button>
-      </div>
-
-      <div className="p-5">
-        <AnimatePresence mode="wait">
-          {tab === 'inquiry' && (
-            <motion.div key="inq" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
-              <InquiryRoom req={req} other={other} inquiry={inquiry} setInquiry={setInquiry} showToast={showToast}
-                onProceedDeposit={() => setTab('deposit')} reload={reload} />
-            </motion.div>
-          )}
-          {tab === 'deposit' && (
-            <motion.div key="dep" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
-              <DepositInline req={req} busy={busy} runAction={runAction} showToast={showToast} />
-            </motion.div>
-          )}
-          {tab === 'choose' && (
-            <motion.div key="cho" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-center py-4">
-              <p className="text-sm font-cairo text-navy-500">اختر أحد الخيارين بالأعلى للمتابعة</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* إلغاء الطلب */}
-        <button onClick={() => setCancelOpen(true)}
-          className="w-full mt-4 text-rose-500 font-cairo font-bold text-sm py-2 hover:text-rose-600 transition-colors">
-          إلغاء الطلب
-        </button>
-      </div>
-
-      <CancelDialog open={cancelOpen} onClose={() => setCancelOpen(false)} busy={busy}
-        onConfirm={async (reason: string) => {
-          const ok = await runAction('cancel', { reason });
-          setCancelOpen(false);
-          if (ok) showToast('تم إلغاء الطلب', 'info');
-        }} />
-    </div>
-  );
-}
-
-// ============================================================
-//  غرفة الاستفسار — المحادثة + الباقة
-// ============================================================
-// أسئلة استفسار جاهزة (chips)
-const INQUIRY_SUGGESTIONS = [
-  'ما توقعاتك بخصوص السكن المستقبلي؟',
-  'هل تمانع/ين استمرار العمل بعد الزواج؟',
-  'ما رأيك في السكن المستقل عن الأهل؟',
-  'كيف تصف/ين التزامك الديني؟',
-  'هل لديك خطط للدراسة أو السفر؟',
-];
-
-function InquiryRoom({ req, other, inquiry, setInquiry, showToast, onProceedDeposit, reload }: any) {
-  const { settings } = useSettings();
-  const { messagePackages, user } = useApp();
-  const currentUserId = user?.memberId || getCurrentUserId();
-  const [buying, setBuying] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [input, setInput] = useState('');
-  const [showBuyInfo, setShowBuyInfo] = useState(false);
-  const [typing, setTyping] = useState(false);
-  const [confirmLow, setConfirmLow] = useState(false);
-  const [payOpen, setPayOpen] = useState(false);
-  const [selectedPkgId, setSelectedPkgId] = useState<string>('medium');
-  const [editingMsgId, setEditingMsgId] = useState<number | null>(null);
-  const [editingMsgText, setEditingMsgText] = useState<string>('');
-  const endRef = useRef<HTMLDivElement>(null);
-
-  const selectedPkg = messagePackages.find((p) => p.id === selectedPkgId) || messagePackages[1] || messagePackages[0];
-  const pkgPrice = selectedPkg.price;
-  const pkgCredits = selectedPkg.credits;
-
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [inquiry.messages.length, typing]);
-
-  // اشتراك لحظي حقيقي عبر الاشتراك اللحظي المحلي — تظهر رسائل الطرف الآخر فوراً بدون إعادة تحميل الصفحة
-  useEffect(() => {
-    if (!req?.id || typeof authClient?.channel !== 'function') return;
-    const channel = authClient
-      .channel(`inquiry-messages-${req.id}`)
-      ?.on('postgres_changes', { event: '*', schema: 'public', table: 'inquiry_messages', filter: `request_id=eq.${req.id}` }, () => {
-        reload?.();
-      })
-      ?.subscribe();
-    return () => { if (channel && typeof authClient?.removeChannel === 'function') authClient.removeChannel(channel); };
-  }, [req?.id, reload]);
-
-  const hasPackage = !!inquiry.inquiry_started_by || inquiry.remaining > 0;
-  const remaining = inquiry.remaining;
-  const low = remaining <= 3;
-
-  // يفتح بوابة الدفع — لا يتم تفعيل الباقة إلا بعد إتمام الدفع فعلياً
-  const handleBuy = () => setPayOpen(true);
-
-  // يُنفّذ فعلياً بعد نجاح الدفع عبر بوابة الدفع — PaymentGateway تُسجّل المعاملة المالية بنفسها
-  // (سواء اكتملت فوراً أو عُلِّقت لمراجعة إدارية)، لذا نتجنب تكرار تسجيلها هنا (skipTransactionRecord=true).
-  const completeBuy = async (): Promise<boolean> => {
-    setBuying(true);
-    const res = await buyMessagePackageCustom(currentUserId, pkgCredits, pkgPrice, req.id, true);
-    setBuying(false);
-    if (res.ok) {
-      const initRes = await initializeInquiryPackage(req.id, currentUserId);
-      if (initRes.ok && initRes.state) {
-        setInquiry(initRes.state);
-      }
-      await reload?.();
-      showToast('تم تفعيل باقة الاستفسار وشحن الرصيد بنجاح! ✓', 'success');
-      return true;
-    }
-    showToast(res.error || 'تعذّر الشراء', 'error');
-    return false;
-  };
-
-  const doSend = async () => {
-    setConfirmLow(false);
-    setSending(true);
-    const res = await sendInquiryMessage(req.id, currentUserId, input.trim());
-    if (res.ok && res.state) {
-      setInquiry(res.state);
-      setInput('');
-      await reload?.();
-      showToast('تم إرسال الرسالة وإشعار الطرف الآخر', 'success');
-    } else {
-      showToast(res.error || 'تعذّر الإرسال', 'error');
-    }
-    setSending(false);
-  };
-
-  const handleSend = () => {
-    if (!input.trim()) return;
-    if (remaining <= 0) { showToast('نفد رصيد الباقة', 'error'); return; }
-    // تأكيد قبل الإرسال عند الرصيد المنخفض (≤3)
-    if (low) { setConfirmLow(true); return; }
-    doSend();
-  };
-
-  // شاشة الشراء
-  if (!hasPackage) {
-    return (
-      <div>
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-center">
-          <MessageSquare className="w-10 h-10 text-amber-500 mx-auto mb-2" />
-          <h3 className="font-cairo font-extrabold text-navy-800">باقة الاستفسار والتوافق للزواج</h3>
-          <p className="text-xs text-navy-600 font-cairo mt-1 leading-relaxed">
-            تريد معرفة المزيد عن {other?.nickname || 'الطرف الآخر'}؟ اختر باقة رسائل استفسار آمنة ومُشرَفة ومباشرة.
-          </p>
-
-          {/* Package Selection Cards */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-3 sm:mt-4">
-            {messagePackages.map((pkg) => {
-              const isSelected = selectedPkgId === pkg.id;
-              const isPopular = pkg.id === 'medium';
-              return (
-                <button
-                  key={pkg.id}
-                  onClick={() => setSelectedPkgId(pkg.id)}
-                  type="button"
-                  className={`relative p-3 rounded-2xl border-2 text-center transition-all duration-300 cursor-pointer flex flex-col justify-between h-full
-                    ${isSelected
-                      ? 'border-amber-500 bg-amber-500/10 shadow-[0_4px_12px_rgba(245,158,11,0.08)] ring-2 ring-amber-400/20'
-                      : 'border-slate-200 bg-white hover:border-amber-300'
-                    }`}
-                >
-                  {isPopular && (
-                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[9px] font-cairo font-black px-1.5 py-0.5 rounded-full shadow-sm whitespace-nowrap">
-                      الأكثر شعبية
-                    </span>
-                  )}
-                  <div className="w-full">
-                    <p className="text-[10px] font-cairo font-black text-navy-800 leading-tight mb-1 truncate">{pkg.name}</p>
-                    <p className="font-cairo font-black text-2xl text-amber-600 leading-none mt-2">{pkg.credits}</p>
-                    <p className="text-[9px] text-navy-400 font-cairo font-bold mt-1">رسالة استفسار</p>
-                  </div>
-                  <div className="w-full">
-                    <div className="h-px bg-slate-200/60 my-2" />
-                    <p className="font-cairo font-black text-xs text-navy-950">{pkg.price} ريال</p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* شرح اقتصاد الباقة بوضوح قبل الشراء */}
-        <button onClick={() => setShowBuyInfo((v) => !v)}
-          className="w-full mt-2 flex items-center justify-center gap-1 text-[11px] font-cairo font-bold text-navy-400 py-1">
-          <Info className="w-3.5 h-3.5" /> كيف يُحتسب الرصيد؟
-        </button>
-        <AnimatePresence>
-          {showBuyInfo && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-              <div className="bg-cream-50 rounded-xl p-3 text-xs font-cairo text-navy-600 leading-relaxed space-y-1">
-                <p>• كل رسالة <strong>ترسلها أنت</strong> = رصيد واحد.</p>
-                <p>• كل <strong>ردّ من الطرف الآخر</strong> = رصيد واحد أيضاً يُخصم من باقتك.</p>
-                <p>• أي رسالة من الطرفين تُحتسب من رصيد صاحب باقة الاستفسار.</p>
-                <p>• الباقة عالمية: يمكنك استخدام رصيد الرسائل المتبقي مع أعضاء آخرين أيضاً!</p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <button onClick={handleBuy} disabled={buying}
-          className="w-full mt-3 bg-amber-500 text-white font-cairo font-extrabold py-3.5 rounded-2xl hover:brightness-105 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
-          {buying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Coins className="w-5 h-5" />}
-          شراء باقة رسائل ({pkgPrice} ريال / {pkgCredits} رسالة)
-        </button>
-        <button onClick={onProceedDeposit}
-          className="w-full mt-2 text-navy-500 font-cairo font-bold text-sm py-2 hover:text-navy-700">
-          تخطّي الاستفسار وسداد العربون ←
-        </button>
-
-        <PaymentGateway
-          open={payOpen}
-          onClose={() => setPayOpen(false)}
-          amount={pkgPrice}
-          title="باقة رسائل الاستفسار والتوافق للزواج"
-          description={`${pkgCredits} رسالة استفسار آمنة ومُشرَفة`}
-          lineItems={[
-            { label: 'عدد الرسائل', value: `${pkgCredits} رسالة` },
-            { label: 'صالحة مع', value: 'جميع الأعضاء' },
-          ]}
-          payLabel="شراء الباقة"
-          onPaid={completeBuy}
-          requestId={req.id}
-          requiresOfflineReview
-          metadata={{ credits: pkgCredits }}
-        />
-      </div>
-    );
-  }
-
-  // غرفة المحادثة
-  return (
-    <div>
-      {/* عدّاد الرصيد */}
-      <div className={`flex items-center justify-between rounded-xl px-3 py-2 mb-3 bg-emerald-50 border border-emerald-200`}>
-        <span className="flex items-center gap-1.5 text-sm font-cairo font-bold text-navy-700">
-          <MessageSquare className="w-4 h-4 text-emerald-500" />
-          رسائل الاستفسار والتوافق للزواج الجاد المتبقية
-        </span>
-        <span className="font-cairo font-extrabold text-emerald-600">
-          {remaining} / {inquiry.package ? inquiry.package.credits_total : 10}
-        </span>
-      </div>
-
-      {/* تنويه تواصل بشري مباشر وبدون ذكاء اصطناعي */}
-      <div className="bg-amber-50/40 border border-amber-200/80 rounded-2xl p-3 mb-3 text-right">
-        <p className="text-xs font-cairo text-amber-900 leading-relaxed font-bold flex items-center gap-1.5 mb-1">
-          💬 تواصل مباشر جاد وآمن
-        </p>
-        <p className="text-[10.5px] font-cairo text-navy-600 leading-relaxed">
-          استفسار مباشر بين الطرفين لضمان المصداقية، بدون ردود آلية أو ذكاء اصطناعي.
-        </p>
-      </div>
-
-      {/* المحادثة */}
-      <div className="bg-cream-50 rounded-2xl p-3 max-h-72 overflow-y-auto space-y-2.5 border border-cream-100">
-        {inquiry.messages.map((m: any, mIdx: number) => {
-          const mine = m.sender_id === currentUserId;
-          const admin = m.sender_id === 'admin';
-          const msgKey = (m?.id !== undefined && m?.id !== null && !Number.isNaN(Number(m.id))) ? `msg-${m.id}-${mIdx}` : `msg-idx-${mIdx}`;
-          const isEditingThis = editingMsgId === m.id;
-
-          return (
-            <div key={msgKey} className={`flex ${admin ? 'justify-center' : mine ? 'justify-start' : 'justify-end'}`}>
-              {admin ? (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-[11px] font-cairo text-blue-700 max-w-[95%] text-center leading-relaxed">
-                  <ShieldCheck className="w-3.5 h-3.5 inline ml-1" />{m.text}
-                </div>
-              ) : (
-                <div className="group relative flex flex-col items-start gap-1 max-w-[85%]">
-                  {/* شريط الأدوات للأعضاء لرسائلهم */}
-                  {mine && (
-                    <div className="flex items-center justify-between w-full px-1 text-[10px] text-slate-400">
-                      <span>أنت</span>
-                      <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
-                        <button
-                          type="button"
-                          title="تعديل الرسالة"
-                          onClick={() => {
-                            if (isEditingThis) {
-                              setEditingMsgId(null);
-                            } else {
-                              setEditingMsgId(m.id);
-                              setEditingMsgText(m.text);
-                            }
-                          }}
-                          className="p-1 hover:bg-cream-200 text-slate-500 hover:text-navy-900 rounded"
-                        >
-                          <Edit3 className="w-3 h-3" />
-                        </button>
-                        <button
-                          type="button"
-                          title="حذف الرسالة"
-                          onClick={async () => {
-                            if (!window.confirm('هل تريد حذف هذه الرسالة؟ سيتم حذفها من كلا الطرفين والإدارة.')) return;
-                            try {
-                              setInquiry((prev: any) => ({
-                                ...prev,
-                                messages: prev.messages.filter((msg: any) => msg.id !== m.id),
-                              }));
-                              await deleteInquiryMessage(m.id);
-                              await reload?.();
-                              showToast('تم حذف الرسالة بنجاح ✓', 'success');
-                            } catch (e) {
-                              showToast('تعذر حذف الرسالة', 'error');
-                            }
-                          }}
-                          className="p-1 hover:bg-rose-100 text-slate-400 hover:text-rose-600 rounded"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {isEditingThis ? (
-                    <div className="p-2.5 bg-white border-2 border-amber-400 rounded-2xl w-full space-y-2 shadow-xs">
-                      <textarea
-                        value={editingMsgText}
-                        onChange={(e) => setEditingMsgText(e.target.value)}
-                        rows={2}
-                        className="w-full text-xs font-cairo p-2 border border-cream-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-400 text-navy-900"
-                      />
-                      <div className="flex justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => { setEditingMsgId(null); setEditingMsgText(''); }}
-                          className="px-2.5 py-1 text-[11px] font-cairo text-slate-500 hover:bg-cream-100 rounded-lg"
-                        >
-                          إلغاء
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!editingMsgText.trim()}
-                          onClick={async () => {
-                            if (!editingMsgText.trim()) return;
-                            const newText = editingMsgText.trim();
-                            try {
-                              setInquiry((prev: any) => ({
-                                ...prev,
-                                messages: prev.messages.map((msg: any) => msg.id === m.id ? { ...msg, text: newText } : msg),
-                              }));
-                              setEditingMsgId(null);
-                              setEditingMsgText('');
-                              await updateInquiryMessage(m.id, newText);
-                              await reload?.();
-                              showToast('تم تعديل الرسالة بنجاح ✓', 'success');
-                            } catch (e) {
-                              showToast('تعذر حفظ التعديل', 'error');
-                            }
-                          }}
-                          className="px-3 py-1 text-[11px] font-cairo font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-lg flex items-center gap-1"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          حفظ
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className={`rounded-2xl px-3.5 py-2 text-sm font-cairo
-                      ${mine ? 'bg-gold-gradient text-navy-900' : 'bg-white border border-cream-200 text-navy-700'}`}>
-                      {m.text}
-                    </div>
-                  )}
-
-                  {mine && !m.approved && !m.rejected && (
-                    <span className="text-[10px] font-cairo text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60 flex items-center gap-1 self-start mr-1 mt-0.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                      قيد مراجعة الإدارة (لن يظهر للطرف الآخر حتى يوافق المشرف)
-                    </span>
-                  )}
-                  {mine && m.approved && (
-                    <span className="text-[10px] font-cairo text-emerald-600 px-1 py-0.5 flex items-center gap-0.5 self-start mr-1 mt-0.5">
-                      ✓ معتمد من الإدارة ومرئي للطرف الآخر
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-        {/* مؤشّر "يكتب الآن" */}
-        {typing && (
-          <div className="flex justify-end">
-            <div className="bg-white border border-cream-200 rounded-2xl px-4 py-2.5 flex items-center gap-1">
-              {[0, 1, 2].map((i) => (
-                <motion.span key={i} className="w-1.5 h-1.5 rounded-full bg-navy-300"
-                  animate={{ y: [0, -4, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.15 }} />
-              ))}
-              <span className="text-[10px] font-cairo text-navy-400 mr-1">يكتب الآن</span>
-            </div>
-          </div>
-        )}
-        <div ref={endRef} />
-      </div>
-
-      {/* اقتراحات أسئلة جاهزة (chips) */}
-      {remaining > 0 && inquiry.messages.length <= 2 && (
-        <div className="flex flex-wrap gap-1.5 mt-3">
-          {INQUIRY_SUGGESTIONS.map((q) => (
-            <button key={q} onClick={() => setInput(q)}
-              className="text-[11px] font-cairo text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-full px-2.5 py-1 transition-colors">
-              {q}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* إدخال */}
-      {remaining > 0 ? (
-        <div className="flex gap-2 mt-3">
-          <input value={input} onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="اكتب استفسارك..." disabled={sending}
-            className="flex-1 bg-white border border-cream-200 rounded-2xl px-4 py-3 text-sm font-cairo focus:outline-none focus:ring-2 focus:ring-amber-200" />
-          <button onClick={handleSend} disabled={sending || !input.trim()}
-            className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center disabled:opacity-50 flex-shrink-0">
-            {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <SendIcon className="w-5 h-5 -scale-x-100" />}
-          </button>
-        </div>
-      ) : (
-        <div className="mt-3 space-y-3">
-          <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 text-center">
-            <p className="text-sm font-cairo font-bold text-rose-600 mb-1">نفد رصيد الرسائل.</p>
-            <p className="text-xs font-cairo text-navy-500 leading-relaxed">يمكنك شراء باقة جديدة أو الانتقال لسداد العربون وتبادل التواصل.</p>
-          </div>
-          <button onClick={handleBuy} disabled={buying}
-            className="w-full bg-amber-500 text-white font-cairo font-extrabold py-3.5 rounded-2xl hover:brightness-105 transition-all disabled:opacity-60 flex items-center justify-center gap-2 shadow-sm">
-            {buying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Coins className="w-5 h-5" />}
-            شراء باقة رسائل للمتابعة ({pkgPrice} ريال / {pkgCredits} رسالة)
-          </button>
-        </div>
-      )}
-
-      {/* الانتقال لالعربون */}
-      <button onClick={onProceedDeposit}
-        className="w-full mt-4 bg-gold-gradient text-navy-900 font-cairo font-extrabold py-3.5 rounded-2xl shadow-gold hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
-        <ShieldCheck className="w-5 h-5" /> انتهيت — سداد العربون
-      </button>
-
-      <PaymentGateway
-        open={payOpen}
-        onClose={() => setPayOpen(false)}
-        amount={pkgPrice}
-        title="باقة رسائل الاستفسار والتوافق للزواج"
-        description={`${pkgCredits} رسالة استفسار آمنة ومُشرَفة`}
-        lineItems={[
-          { label: 'عدد الرسائل', value: `${pkgCredits} رسالة` },
-          { label: 'صالحة مع', value: 'جميع الأعضاء' },
-        ]}
-        payLabel="شراء الباقة"
-        onPaid={completeBuy}
-        requestId={req.id}
-        requiresOfflineReview
-        metadata={{ credits: pkgCredits }}
-      />
-    </div>
-  );
-}
-
-// ============================================================
-//  لوحة العربون (داخل مركز مقبول)
-// ============================================================
 function DepositInline({ req, busy, runAction, showToast }: any) {
   const { settings } = useSettings();
   const { user, paymentSettings, socialSettings } = useApp();
@@ -1759,10 +1230,10 @@ function RecordResultButton({ req, busy, runAction }: any) {
         )}
 
         <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3}
-          placeholder={choice === 'failed' ? 'اكتب رسالة اعتذار لطيفة للطرف الآخر (إلزامي)' : 'ملاحظة اختيارية'}
+          placeholder={choice === 'failed' ? 'اكتب سبب الاعتذار باحترام (إلزامي)' : 'ملاحظة اختيارية'}
           className="w-full bg-white border border-cream-200 rounded-xl p-3 text-sm font-cairo focus:outline-none focus:ring-2 focus:ring-gold-200" />
         {choice === 'failed' && !note.trim() && (
-          <p className="text-[11px] text-rose-500 font-cairo mt-1">يرجى كتابة رسالة الاعتذار بلطف لإرسالها للطرف الآخر.</p>
+          <p className="text-[11px] text-rose-500 font-cairo mt-1">يرجى توضيح سبب الاعتذار لتسجيل نتيجة الرحلة.</p>
         )}
         <button
           disabled={choice === 'failed' && !note.trim()}

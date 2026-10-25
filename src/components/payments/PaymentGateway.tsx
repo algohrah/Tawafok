@@ -11,7 +11,7 @@ import { dataService } from '../../lib/data/DataService';
 
 // ============================================================
 //  بوابة الدفع الموحّدة — تُستخدم لكل المدفوعات داخل المنصة
-//  (باقة الرسائل، رسوم الجدية، الباقات...)
+//  (رسوم الجدية والعضوية وأتعاب الرحلة)
 //  تقرأ طرق الدفع من إعدادات الموقع (paymentSettings / paypalSettings)
 //  لضمان ربط كل عملية دفع بنفس وسائل الدفع المعتمدة في المنصة.
 // ============================================================
@@ -21,7 +21,7 @@ export interface PaymentGatewayProps {
   onClose: () => void;
   /** المبلغ الأساسي قبل الضريبة (ر.س) */
   amount: number;
-  /** عنوان عملية الدفع، مثل: "باقة رسائل الاستفسار" */
+  /** عنوان عملية الدفع، مثل: "رسوم الجدية" */
   title: string;
   /** وصف مختصر يظهر تحت العنوان */
   description?: string;
@@ -35,9 +35,9 @@ export interface PaymentGatewayProps {
   onPaid: (method: string) => Promise<boolean> | boolean;
   /** معرّف طلب الاهتمام المرتبط (لرسوم الجدية) — يُرفق مع المعاملة ليستخدمه المشرف عند الاعتماد */
   requestId?: number;
-  /** هل تمر المدفوعات اليدوية (بنكي/عملات رقمية) عبر مراجعة إدارية قبل التفعيل؟ (افتراضي: false للحفاظ على السلوك الحالي في بقات الرسائل/السعي) */
+  /** هل تمر المدفوعات اليدوية (بنكي/عملات رقمية) عبر مراجعة إدارية قبل التفعيل؟ (افتراضي: false للحفاظ على السلوك الحالي لرسوم الرحلة) */
   requiresOfflineReview?: boolean;
-  /** بيانات إضافية تُرفق مع المعاملة (مثل عدد رسائل الباقة) ليستخدمها المشرف عند الاعتماد الفعلي */
+  /** بيانات إضافية تُرفق مع المعاملة (مثل مرحلة الرحلة) ليستخدمها المشرف عند الاعتماد الفعلي */
   metadata?: Record<string, any>;
 }
 
@@ -125,14 +125,16 @@ export default function PaymentGateway({
     ? 'deposit'
     : metadata?.paymentStage === 'final_fee' || title.includes('المتبقي') || title.includes('سعي')
       ? 'final'
-      : title.includes('استفسار')
-        ? 'inquiry'
-        : 'subscription';
+      : 'subscription';
   // المدفوعات اليدوية (بنكي/عملات رقمية) تمر عبر مراجعة إدارية قبل التفعيل الفعلي لمنع التفعيل الوهمي الفوري
   const isOfflineMethod = method === 'crypto' || method === 'bank';
   const needsReview = requiresOfflineReview && isOfflineMethod;
 
   const finalize = useCallback(async () => {
+    if (title.includes('استفسار') || metadata?.paymentStage === 'inquiry' || metadata?.credits) {
+      showToast('هذه الخدمة غير متاحة. تواصل مع الإدارة للمساعدة.', 'info');
+      return;
+    }
     setProcessing(true);
     // محاكاة معالجة بوابة الدفع
     await new Promise((r) => setTimeout(r, 1400));

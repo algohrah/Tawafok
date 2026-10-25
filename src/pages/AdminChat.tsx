@@ -357,7 +357,6 @@ export default function AdminChat() {
                 const inq = requestInquiries[req.id];
                 const adminMessages = inq?.messages?.filter((m: any) => m.sender_id === 'admin') || [];
                 const latestAdminMsg = adminMessages.length > 0 ? adminMessages[adminMessages.length - 1] : null;
-                const latestInqMsg = inq?.messages && inq.messages.length > 0 ? inq.messages[inq.messages.length - 1] : null;
 
                 return (
                   <motion.div
@@ -422,29 +421,6 @@ export default function AdminChat() {
                       </div>
                     )}
 
-                    {/* Latest inquiry message if exists and not admin */}
-                    {latestInqMsg && latestInqMsg.sender_id !== 'admin' && (
-                      <div className="mb-3 bg-cream-50/70 dark:bg-navy-950/60 border border-cream-200/60 dark:border-navy-800 rounded-2xl p-3">
-                        <div className="flex items-center justify-between gap-2 mb-1 text-[11px] text-slate-400 flex-wrap">
-                          <span className="font-bold text-navy-800 dark:text-cream-100 flex items-center gap-1">
-                            <MessageCircle className="w-3.5 h-3.5 text-gold-500" />
-                            آخر رسالة في استفسار التوافق
-                          </span>
-                          <span>{new Date(latestInqMsg.created_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                        <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 italic">
-                          "{latestInqMsg.text}"
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Original interest message */}
-                    {!latestAdminMsg && !latestInqMsg && req.message && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 italic bg-cream-50/60 dark:bg-navy-950/40 p-2.5 rounded-xl border border-cream-200/50 dark:border-navy-800/60 mb-3">
-                        "{req.message}"
-                      </p>
-                    )}
-
                     {/* Action buttons */}
                     <div className="flex items-center gap-2 pt-1 border-t border-cream-100 dark:border-navy-800">
                       <button
@@ -456,14 +432,6 @@ export default function AdminChat() {
                         <ArrowLeft className="w-3.5 h-3.5 rotate-180 flex-shrink-0" />
                       </button>
 
-                      <button
-                        onClick={() => navigate(`/journey/${req.id}?tab=inquiry`)}
-                        className="flex items-center justify-center gap-1.5 py-2.5 px-3 sm:px-3.5 rounded-xl bg-cream-100 dark:bg-navy-800 hover:bg-cream-200 dark:hover:bg-navy-700 text-navy-800 dark:text-cream-100 font-cairo font-bold text-xs transition-colors cursor-pointer border border-cream-200/80 dark:border-navy-700 flex-shrink-0"
-                        title="غرفة الاستفسار والرسائل المباشرة"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5 text-gold-600 dark:text-gold-400" />
-                        <span className="hidden sm:inline">الاستفسارات</span>
-                      </button>
                     </div>
                   </motion.div>
                 );
