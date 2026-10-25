@@ -12,10 +12,12 @@ import { getAvatar, getGenderColors } from '../lib/types';
 import { useApp } from '../lib/AppContext';
 import { formatMaritalStatus } from '../lib/memberUtils';
 import MemberProfileModal from './MemberProfileModal';
+import './MemberCard.css';
 
-export default function MemberCard({ member, homePreview = false }: { member: Member; homePreview?: boolean; key?: any }) {
+export default function MemberCard({ member }: { member: Member; key?: any }) {
   const navigate = useNavigate();
   const [modalOpen, setModalOpen] = useState(false);
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const { user, likedMembers, toggleLike, showToast } = useApp();
   const liked = user?.isLoggedIn ? likedMembers.has(member.id) : false;
   const safeGender = (member.gender === 'male' || member.gender === 'female' ? member.gender : 'female') as any;
@@ -50,43 +52,28 @@ export default function MemberCard({ member, homePreview = false }: { member: Me
       <motion.div
         whileHover={{ y: -4 }}
         transition={{ type: 'spring', stiffness: 300, damping: 22 }}
-        className={`${homePreview ? 'home-member-card ' : ''}group bg-white rounded-2xl overflow-hidden shadow-soft hover:shadow-luxe transition-shadow duration-500 border border-cream-200/70 flex flex-col h-full cursor-pointer`}
+        className={`member-card group bg-white rounded-2xl overflow-hidden shadow-soft hover:shadow-luxe transition-shadow duration-500 border border-cream-200/70 flex flex-col h-full cursor-pointer`}
         onClick={handleOpenModal}
       >
         <div className="block flex flex-col flex-1 no-tap-highlight select-none">
           {/* ===== الرأس المبسّط: الصورة + الاسم + صف الشارات ===== */}
-          {homePreview ? (
-            <div className={`home-card-banner ${c.bg}`}>
-              <div className="home-card-heading">
-                <span className={`home-card-avatar ${c.text}`}><UserRound aria-hidden="true" size={24} /></span>
-                <h3 className="home-card-title">{displayName}</h3>
-              </div>
-              <div className="home-card-badges">
-                <span className={c.textStrong}>{isMale ? 'رجل' : 'امرأة'}</span>
-                {member.verified && <span className="inline-flex items-center gap-1 text-emerald-700" title="توثيق منفصل عن العضوية المميزة"><ShieldCheck aria-hidden="true" size={14} />موثّق</span>}
-                {isFeatured(member) && <FeaturedBadge />}
-                {member.hasSeriousnessBadge && <span className="text-gold-700" title="وسام الجدية — ليس ضمانًا للتوافق">وسام الجدية</span>}
-                <span className="home-card-source">{isImported ? 'ملف وساطة تديره الإدارة' : 'عضو مسجّل'}</span>
-              </div>
-            </div>
-          ) : (
           <div className={`relative ${c.bg} p-2.5 sm:p-4`}>
             <div className="flex items-center gap-2 sm:gap-3">
               {/* الصورة الافتراضية */}
               <div className="relative flex-shrink-0">
-                <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-white flex items-center justify-center overflow-hidden ring-2 ${c.ring} ring-opacity-30 shadow-sm`}>
-                  <img src={avatar} alt="" className="w-full h-full object-contain p-1.5" />
+                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white flex items-center justify-center overflow-hidden ring-2 ${c.ring} ring-opacity-30 shadow-sm`}>
+                  {avatarFailed ? <UserRound aria-hidden="true" className={`w-6 h-6 ${c.text}`} /> : <img src={avatar} alt="" onError={() => setAvatarFailed(true)} className="w-full h-full object-contain p-1.5" />}
                 </div>
               </div>
 
               {/* الاسم + صف الشارات المرتّب */}
               <div className="flex-1 min-w-0 pr-1">
-                <h3 className="font-cairo font-bold text-navy-900 text-sm sm:text-base leading-tight truncate">
+                <h3 className="member-card-title text-navy-900" title={displayName}>
                   {displayName}
                 </h3>
                 {/* صف واحد مرتّب لجميع الشارات */}
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${c.badgeBg} text-white`}>
+                  <span className={`member-card-gender ${isMale ? 'member-card-gender-male' : 'member-card-gender-female'} inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-white`}>
                     <GenderIcon isMale={isMale} white />
                     <span className="text-[9px] sm:text-[10px] font-cairo font-bold">{isMale ? 'رجل' : 'امرأة'}</span>
                   </span>
@@ -111,8 +98,6 @@ export default function MemberCard({ member, homePreview = false }: { member: Me
               </div>
             </div>
           </div>
-          )}
-
           {/* ===== جسم البطاقة ===== */}
           <div className="p-2.5 sm:p-4 flex flex-col flex-1">
             {/* الموقع */}
@@ -124,7 +109,7 @@ export default function MemberCard({ member, homePreview = false }: { member: Me
             </div>
 
             {/* شبكة المعلومات: العمر + الحالة + الوظيفة */}
-            <div className={`${homePreview ? 'home-card-facts ' : ''}grid grid-cols-3 gap-1 sm:gap-2 mb-2 sm:mb-2.5`}>
+            <div className={`grid grid-cols-3 gap-1 sm:gap-2 mb-2 sm:mb-2.5`}>
               {[
                 { icon: Calendar, label: 'العمر', value: member.age ? `${member.age} سنة` : '—', sub: '' },
                 { icon: Users, label: 'الحالة', value: maritalFormatted, sub: '' },
@@ -137,7 +122,7 @@ export default function MemberCard({ member, homePreview = false }: { member: Me
                       {item.value}
                     </div>
                   </div>
-                  <div className={`${homePreview ? 'home-card-fact-label ' : ''}text-[8px] sm:text-[9px] text-navy-400 font-tajawal break-words whitespace-normal line-clamp-1 mt-1`}>
+                  <div className={`text-[8px] sm:text-[9px] text-navy-400 font-tajawal break-words whitespace-normal line-clamp-1 mt-1`}>
                     {item.label}
                   </div>
                 </div>
@@ -145,7 +130,7 @@ export default function MemberCard({ member, homePreview = false }: { member: Me
             </div>
 
             {/* قسم "أبحث عن" (الملاحظات الكتابية كما كانت) */}
-            <div className={`${homePreview ? 'home-card-partner ' : ''}rounded-lg sm:rounded-xl ${c.bg} p-2 mb-2 sm:p-2.5 sm:mb-2.5`}>
+            <div className={`rounded-lg sm:rounded-xl ${c.bg} p-2 mb-2 sm:p-2.5 sm:mb-2.5`}>
               <div className="flex items-center gap-1.5 mb-1">
                 <Heart className={`w-3.5 h-3.5 ${c.text}`} />
                 <span className={`text-[11px] font-cairo font-bold ${c.textStrong} whitespace-nowrap`}>أبحث عن</span>
@@ -162,7 +147,7 @@ export default function MemberCard({ member, homePreview = false }: { member: Me
             </div>
 
             {/* الأزرار — زر الحفظ أيقونة فقط + زر العرض موسّع */}
-            <div className={`${homePreview ? 'home-card-controls ' : ''}mt-auto flex items-center gap-2`}>
+            <div className={`mt-auto flex items-center gap-2`}>
               <button
                 onClick={(e) => {
                   e.preventDefault();
@@ -185,7 +170,7 @@ export default function MemberCard({ member, homePreview = false }: { member: Me
               <button
                 type="button"
                 onClick={handleOpenModal}
-                className={`flex-1 h-10 sm:h-12 flex items-center justify-center gap-2 rounded-xl ${c.bgStrong} text-white font-cairo font-bold text-xs sm:text-sm transition-all hover:brightness-110 shadow-sm cursor-pointer`}
+                className={`member-card-view flex-1 h-10 sm:h-12 flex items-center justify-center gap-2 rounded-xl ${c.bgStrong} text-white font-cairo font-bold text-xs sm:text-sm transition-all hover:brightness-110 shadow-sm cursor-pointer`}
               >
                 <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
                 عرض الملف

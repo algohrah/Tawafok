@@ -149,7 +149,7 @@ export default function Home() {
       <section id="featured-members" className="home-section" aria-labelledby="featured-members-heading">
         <div className="home-container">
           <div className="home-section-heading"><div><p className="home-eyebrow">اكتشف الملفات</p><h2 id="featured-members-heading">الأعضاء المميزون</h2><p>ملفات تحمل عضوية «توافق مميز». التمييز منفصل عن توثيق الهوية.</p></div><Link className="home-text-link" to="/plans">مزايا توافق مميز<ArrowLeft aria-hidden="true" size={16} /></Link></div>
-          <div className="home-member-grid" aria-busy={membersLoading}>{membersLoading && !featuredMembers.length ? <MemberGridSkeleton count={4} /> : featuredMembers.map((member) => <MemberCard key={`featured-${member.id}`} member={member} homePreview />)}</div>
+          <div className="home-member-grid" aria-busy={membersLoading}>{membersLoading && !featuredMembers.length ? <MemberGridSkeleton count={4} /> : featuredMembers.map((member) => <MemberCard key={`featured-${member.id}`} member={member} />)}</div>
           {!membersLoading && !featuredMembers.length && <div className="home-empty"><p>لا توجد ملفات مميزة متاحة حاليًا.</p><Link className="home-text-link" to="/search">تصفّح بقية الملفات<ArrowLeft aria-hidden="true" size={16} /></Link></div>}
         </div>
       </section>
@@ -157,7 +157,7 @@ export default function Home() {
       <section className="home-section home-section-soft" aria-labelledby="home-recent-title">
         <div className="home-container">
           <div className="home-section-heading"><div><h2 id="home-recent-title">أحدث الملفات</h2><p>اكتشف ملفات أخرى، واطّلع على التفاصيل قبل إرسال طلبك.</p></div><Link className="home-text-link" to="/search">عرض جميع الملفات<ArrowLeft aria-hidden="true" size={16} /></Link></div>
-          <div className="home-member-grid" aria-busy={membersLoading}>{membersLoading && !recentMembers.length ? <MemberGridSkeleton count={4} /> : recentMembers.map((member) => <MemberCard key={`recent-${member.id}`} member={member} homePreview />)}</div>
+          <div className="home-member-grid" aria-busy={membersLoading}>{membersLoading && !recentMembers.length ? <MemberGridSkeleton count={4} /> : recentMembers.map((member) => <MemberCard key={`recent-${member.id}`} member={member} />)}</div>
           {!membersLoading && !recentMembers.length && <div className="home-empty"><p>لا توجد ملفات إضافية لعرضها هنا حاليًا.</p><Link className="home-text-link" to="/search">انتقل إلى البحث<ArrowLeft aria-hidden="true" size={16} /></Link></div>}
           <p className="home-section-note"><FileCheck aria-hidden="true" size={18} />بعض الملفات لأعضاء مسجّلين، وبعضها ملفات وساطة تديرها الإدارة. يظهر نوع الملف على بطاقته.</p>
         </div>

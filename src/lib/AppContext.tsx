@@ -2849,7 +2849,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         (r.createdAt || r.created_at) && new Date(r.createdAt || r.created_at).getTime() >= Date.parse(day.start) &&
         new Date(r.createdAt || r.created_at).getTime() < Date.parse(day.end)
       ).length;
-      if (serverQuota?.memberId === user.memberId && Date.parse(serverQuota.resetAt) > Date.now()) {
+      if (serverQuota && user.memberId && serverQuota.memberId === user.memberId && Date.parse(serverQuota.resetAt) > Date.now()) {
         current = Math.max(current, serverQuota.used);
         max = serverQuota.limit;
       }

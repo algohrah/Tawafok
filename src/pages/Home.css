@@ -80,24 +80,6 @@
 .home-page .home-empty { padding: 32px; border: 1px dashed var(--home-border); border-radius: 16px; text-align: center; color: var(--home-muted); }
 .home-page .home-section-note { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--home-muted); margin-top: 20px; }
 .home-section-note > svg { flex-shrink: 0; margin-top: 4px; }
-.home-page .home-member-card { border-color: var(--home-border); box-shadow: none; }
-.home-member-card .home-card-banner { padding: 16px; min-height: 156px; }
-.home-member-card .home-card-heading { display: flex; align-items: center; gap: 10px; min-height: 48px; }
-.home-member-card .home-card-avatar { width: 36px; height: 36px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: 1px solid currentColor; border-radius: 12px; }
-.home-member-card .home-card-title { font-size: 16px; line-height: 1.6; color: var(--home-ink); font-weight: 700; overflow-wrap: anywhere; }
-.home-member-card .home-card-badges { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-.home-member-card .home-card-badges > span { font-size: 12px; line-height: 1.6; max-width: 100%; }
-.home-member-card .home-card-fact-label { font-size: 12px; line-height: 1.5; }
-.dark .home-member-card .home-card-source { background: #1c2a40; color: #d4deea; border-color: #405878; }
-.home-member-card .home-card-source { font-size: 12px; line-height: 1.6; color: #30435f; background: #e8edf4; border: 1px solid #d4deea; padding: 3px 6px; border-radius: 6px; }
-.home-member-card .home-card-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.home-member-card .home-card-facts > :last-child { grid-column: 1 / -1; }
-.home-member-card .home-card-facts [title] { font-size: 14px; line-height: 1.5; }
-.home-member-card .home-card-facts [title] + div { font-size: 12px; }
-.home-member-card .home-card-partner p { font-size: 14px; line-height: 1.7; }
-.home-member-card .home-card-controls button { min-height: 44px; font-size: 14px; }
-.home-page .home-card-controls button:last-child { background: #0b1828; color: #fff; }
-.dark .home-page .home-card-controls button:last-child { background: #f8dc91; color: #0b1828; }
 .home-journey-grid { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 32px; }
 .home-journey-step { padding-block: 24px; border-top: 1px solid var(--home-border); }
 .home-journey-top { display: flex; justify-content: space-between; align-items: center; color: var(--home-accent); margin-bottom: 12px; }
@@ -150,10 +132,6 @@
   .home-overview-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }
   .home-section-heading { flex-direction: column; align-items: stretch; gap: 8px; margin-bottom: 20px; }
   .home-member-grid { gap: 12px; }
-  .home-member-card .home-card-banner { padding: 12px; min-height: 172px; }
-  .home-member-card .home-card-heading { gap: 8px; align-items: flex-start; }
-  .home-member-card .home-card-avatar { width: 28px; height: 32px; border: 0; }
-  .home-member-card .home-card-title { font-size: 15px; }
   .home-journey-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
   .home-page .home-journey-step h3 { font-size: 18px; }
   .home-page .home-journey-step p { font-size: 15px; }
@@ -171,5 +149,4 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .home-page *, .home-page *::before, .home-page *::after { animation: none !important; transition: none !important; scroll-behavior: auto; }
-  .home-page .home-member-card { transform: none !important; }
 }
