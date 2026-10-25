@@ -1,19 +1,11 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import {
-  Headphones, Plus, Send, Clock, CheckCircle2, AlertCircle,
-  MessageSquare, ChevronLeft, Headphones as Support, Check,
-  HeartHandshake, Sparkles, ShieldCheck, ArrowRight, ArrowLeft,
-  ExternalLink, MessageCircle, MapPin, BadgeCheck, Zap,
-} from 'lucide-react';
+import { Headphones, Plus, Send, Clock, CheckCircle2, AlertCircle, ChevronLeft, Headphones as Support, ShieldCheck } from 'lucide-react';
 import { useApp } from '../lib/AppContext';
-import type { SupportTicket } from '../lib/types';
-import { getAvatar, getGenderColors } from '../lib/types';
 import { Button } from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
-import { useInterestRequests, getCurrentUserId } from '../lib/useInterestRequests';
-import { dataService } from '../lib/data/DataService';
+
 
 const statusConfig = {
   open: { label: 'مفتوحة', color: 'text-sky-600 bg-sky-50', icon: Clock },
@@ -22,37 +14,18 @@ const statusConfig = {
   closed: { label: 'مغلقة', color: 'text-navy-400 bg-cream-100', icon: CheckCircle2 },
 };
 
-const stageLabels: Record<string, { label: string; color: string }> = {
-  sent: { label: 'بانتظار الموافقة المبدئية', color: 'text-amber-800 bg-amber-50 border-amber-200/80 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800' },
-  accepted: { label: 'الموافقة المبدئية والسداد عبر الإدارة', color: 'text-sky-800 bg-sky-50 border-sky-200/80 dark:bg-sky-950/30 dark:text-sky-300 dark:border-sky-800' },
-  seriousness: { label: 'الموافقة المبدئية والسداد عبر الإدارة', color: 'text-purple-800 bg-purple-50 border-purple-200/80 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-800' },
-  coordination: { label: 'التنسيق وتبادل بيانات أولياء الأمور', color: 'text-indigo-800 bg-indigo-50 border-indigo-200/80 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-indigo-800' },
-  sharia_viewing: { label: 'الخطبة والمهر', color: 'text-teal-800 bg-teal-50 border-teal-200/80 dark:bg-teal-950/30 dark:text-teal-300 dark:border-teal-800' },
-  engagement: { label: 'الخطبة والمهر', color: 'text-teal-800 bg-teal-50 border-teal-200 dark:bg-teal-950 dark:text-teal-300' },
-  completed: { label: 'مرحلة نتيجة الزواج', color: 'text-emerald-800 bg-emerald-50 border-emerald-200/80 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800' },
-  declined: { label: 'تم الاعتذار بلطف', color: 'text-rose-800 bg-rose-50 border-rose-200/80 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-800' },
-  cancelled: { label: 'ملغي', color: 'text-slate-800 bg-slate-100 border-slate-200/80 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-800' },
-};
-
 const categories = ['استفسار عام', 'طلب ترقية', 'مشكلة تقنية', 'شكوى', 'اقتراح'] as const;
 
 export default function AdminChat() {
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const {
     showToast,
     supportTickets,
     sendSupportMessage,
     createSupportTicket,
-    members,
     user,
   } = useApp();
 
-  const activeUserId = user?.memberId || getCurrentUserId();
-  const { requests, loading: requestsLoading } = useInterestRequests(activeUserId);
-
-  const [activeMainTab, setActiveMainTab] = useState<'requests' | 'tickets'>('requests');
-  const [requestInquiries, setRequestInquiries] = useState<Record<number, any>>({});
+  const activeUserId = user?.isLoggedIn ? user.memberId || '' : '';
   const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [newTicketOpen, setNewTicketOpen] = useState(false);
@@ -60,93 +33,18 @@ export default function AdminChat() {
   const [newCategory, setNewCategory] = useState<typeof categories[number]>('استفسار عام');
   const [newMessage, setNewMessage] = useState('');
 
-  // تحميل تفاصيل رسائل واستفسارات الإدارة لكل طلب
-  useEffect(() => {
-    let mounted = true;
-    const loadInquiries = async () => {
-      if (!requests || requests.length === 0) return;
-      const inqMap: Record<number, any> = {};
-      for (const r of requests) {
-        try {
-          const inq = await dataService.db.getInquiry(r.id);
-          inqMap[r.id] = inq;
-        } catch {
-          // ignore
-        }
-      }
-      if (mounted) {
-        setRequestInquiries(inqMap);
-      }
-    };
-    loadInquiries();
-    const handleUpdate = () => loadInquiries();
-    window.addEventListener('storage', handleUpdate);
-    window.addEventListener('twafok_notification_update', handleUpdate);
-    return () => {
-      mounted = false;
-      window.removeEventListener('storage', handleUpdate);
-      window.removeEventListener('twafok_notification_update', handleUpdate);
-    };
-  }, [requests]);
-
-  // Active ticket calculated reactively from shared state
-  const activeTicket = supportTickets.find(t => t.id === activeTicketId) || null;
-
-  // Sync / intercept partner coordination redirect parameters
-  useEffect(() => {
-    const partnerId = searchParams.get('partnerId');
-    if (partnerId) {
-      const partner = members.find(m => m.id === partnerId);
-      if (partner) {
-        const expectedSubject = `التنسيق وتبادل بيانات أولياء الأمور - ${partner.nickname}`;
-        // Try to find existing conversation
-        const existing = supportTickets.find(
-          t => t.userId === activeUserId && t.subject === expectedSubject
-        );
-        if (existing) {
-          setActiveMainTab('tickets');
-          setActiveTicketId(existing.id);
-        } else {
-          const initialText = `السلام عليكم ورحمة الله وبركاته،
-يسعدنا في إدارة «توافق» البدء في التنسيق وتبادل بيانات أولياء الأمور والتقريب المبارك بينكما.
-
-بطاقة العضو المطلوب التنسيق معه:
-• الاسم المستعار: ${partner.nickname}
-• العمر: ${partner.age} سنة
-• المدينة: ${partner.city}
-• المؤهل الدراسي: ${partner.education}
-• جهة العمل: ${partner.workType}
-
-يرجى تأكيد رغبتكم بالبدء وسيقوم وسيط العلاقات بالتواصل مع عائلة العضو والبدء في الرؤية الشرعية الرسمية للطرفين.`;
-
-          const created = createSupportTicket(expectedSubject, 'استفسار عام', initialText, activeUserId);
-          setActiveMainTab('tickets');
-          setActiveTicketId(created.id);
-          showToast('تم فتح محادثة التنسيق وتبادل بيانات أولياء الأمور مع الإدارة 🌸', 'success');
-        }
-      }
-      searchParams.delete('partnerId');
-      setSearchParams(searchParams);
-    }
-  }, [searchParams, members, supportTickets, createSupportTicket, setSearchParams, showToast, activeUserId]);
+  const activeTicket = supportTickets.find(t => t.id === activeTicketId && t.userId === activeUserId) || null;
 
   const sendMessage = () => {
-    if (!draft.trim() || !activeTicketId) return;
-    sendSupportMessage(activeTicketId, draft, 'user');
+    if (!activeUserId || !draft.trim() || !activeTicket) return;
+    sendSupportMessage(activeTicket.id, draft, 'user');
     setDraft('');
 
-    // Simulated helper reply after 2.5 seconds
-    setTimeout(() => {
-      sendSupportMessage(
-        activeTicketId,
-        'شكرًا لتواصلك معنا الدائم في توافق. تم استلام تدوينك، وسلَّم وسيط العلاقات الطلب لمراجعته وسيتم إفادتك فور الاتصال المباشر مع الأطراف. 🌸',
-        'admin'
-      );
-    }, 2500);
+
   };
 
   const createTicket = () => {
-    if (!newSubject.trim() || !newMessage.trim()) return;
+    if (!activeUserId || !newSubject.trim() || !newMessage.trim()) return;
     const created = createSupportTicket(newSubject, newCategory, newMessage, activeUserId);
     setNewTicketOpen(false);
     setNewSubject('');
@@ -156,7 +54,9 @@ export default function AdminChat() {
   };
 
   // Only show tickets relevant to the active user
-  const userTickets = supportTickets.filter(t => t.userId === activeUserId || t.userId === 'm2');
+  const userTickets = supportTickets.filter(t => t.userId === activeUserId);
+
+  if (!activeUserId) return <div dir="rtl" className="max-w-3xl mx-auto p-8 text-center"><h1>الدعم والاستفسارات</h1><p>سجّل الدخول لمراجعة تذاكرك والتواصل مع الإدارة.</p><Link to="/login" className="underline">تسجيل الدخول</Link></div>;
 
   if (activeTicket) {
     const sc = statusConfig[activeTicket.status] || statusConfig.open;
@@ -167,7 +67,7 @@ export default function AdminChat() {
             onClick={() => setActiveTicketId(null)}
             className="flex items-center gap-2 text-navy-600 dark:text-cream-200 hover:text-gold-700 font-cairo font-semibold text-sm mb-4 transition-colors"
           >
-            <ChevronLeft className="w-4 h-4 rotate-180" /> رجوع لقائمة الإدارة والتذاكر
+            <ChevronLeft className="w-4 h-4 rotate-180" /> العودة إلى تذاكر الدعم
           </button>
 
           <div className="bg-white dark:bg-navy-900 rounded-3xl shadow-soft border border-cream-200/60 dark:border-navy-800 overflow-hidden flex flex-col h-[70vh]">
@@ -211,7 +111,7 @@ export default function AdminChat() {
                         <p className="font-tajawal text-sm leading-relaxed">{msg.text}</p>
                       </div>
                       <span className="text-[10px] mt-1 block text-navy-400 dark:text-slate-400 px-1">
-                        {msg.sender === 'admin' ? 'مستشار العلاقات الشرعية' : 'أنت'} · {msg.time}
+                        {msg.sender === 'admin' ? 'فريق الدعم' : 'أنت'} · {msg.time}
                       </span>
                     </div>
                   </div>
@@ -225,7 +125,7 @@ export default function AdminChat() {
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                placeholder="اكتب رسالتك للإدارة والوسيط الشرعي..."
+                placeholder="اكتب رسالتك لفريق الدعم..."
                 className="flex-1 min-w-0 px-3.5 sm:px-4 py-3 rounded-xl bg-cream-50 dark:bg-navy-950 border border-cream-200 dark:border-navy-800 focus:border-gold-400 focus:outline-none font-tajawal text-navy-950 dark:text-cream-50 text-sm sm:text-base"
               />
               <button
@@ -251,18 +151,16 @@ export default function AdminChat() {
               <Headphones className="w-5 h-5 sm:w-6 sm:h-6 text-gold-300" />
             </div>
             <div>
-              <h1 className="font-cairo font-extrabold text-xl sm:text-2xl text-navy-900 dark:text-cream-50">إدارة التواصل وتنسيق التوافق</h1>
-              <p className="text-navy-600 dark:text-slate-300 font-tajawal text-xs sm:text-sm text-right">نتابع طلباتك ونوجهك خطوة بخطوة حتى التوفيق المبارك</p>
+              <h1 className="font-cairo font-extrabold text-xl sm:text-2xl text-navy-900 dark:text-cream-50">الدعم والاستفسارات</h1>
+              <p className="text-navy-600 dark:text-slate-300 font-tajawal text-xs sm:text-sm text-right">تواصل مع الإدارة لحل مشكلة أو الإجابة عن استفسار</p>
             </div>
           </div>
-          {activeMainTab === 'tickets' && (
             <button
               onClick={() => setNewTicketOpen(true)}
               className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gold-gradient text-navy-900 font-cairo font-bold text-sm shadow-soft hover:shadow-gold transition-all cursor-pointer self-start sm:self-auto w-full sm:w-auto"
             >
               <Plus className="w-4 h-4" /> تذكرة جديدة
             </button>
-          )}
         </div>
 
         {/* Info banner */}
@@ -271,178 +169,14 @@ export default function AdminChat() {
           <div className="relative flex items-center gap-3">
             <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6 text-gold-300 flex-shrink-0" />
             <p className="text-cream-200/90 font-tajawal text-xs sm:text-sm text-right leading-relaxed">
-              التواصل في توافق <span className="text-gold-300 font-bold">بإشراف إداري ووساطة شرعية رسمية</span>. نضمن خصوصية العائلات وسرية المراسلات والتنسيق المباشر.
+              <span className="text-gold-300 font-bold">فريق الدعم هنا لمساعدتك.</span> لا ترسل بيانات مالية أو بيانات هوية حساسة في رسالتك.
             </p>
           </div>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex items-center gap-1.5 sm:gap-2 p-1.5 bg-white dark:bg-navy-900 border border-cream-200/80 dark:border-navy-800 rounded-2xl mb-6 shadow-xs">
-          <button
-            onClick={() => setActiveMainTab('requests')}
-            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl font-cairo font-bold text-xs sm:text-sm transition-all cursor-pointer min-w-0 ${
-              activeMainTab === 'requests'
-                ? 'bg-navy-900 text-white dark:bg-gold-gradient dark:text-navy-950 shadow-sm'
-                : 'text-slate-600 dark:text-slate-300 hover:bg-cream-100 dark:hover:bg-navy-800'
-            }`}
-          >
-            <HeartHandshake className="w-4 h-4 flex-shrink-0" />
-            <span className="truncate">
-              <span className="hidden sm:inline">طلبات التوافق وتوجيهات الإدارة</span>
-              <span className="sm:hidden">طلبات التوافق</span>
-            </span>
-            {requests.length > 0 && (
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0 ${
-                activeMainTab === 'requests'
-                  ? 'bg-white/20 text-white dark:bg-navy-900 dark:text-gold-300'
-                  : 'bg-cream-200 dark:bg-navy-800 text-slate-700 dark:text-slate-300'
-              }`}>
-                {requests.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveMainTab('tickets')}
-            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl font-cairo font-bold text-xs sm:text-sm transition-all cursor-pointer min-w-0 ${
-              activeMainTab === 'tickets'
-                ? 'bg-navy-900 text-white dark:bg-gold-gradient dark:text-navy-950 shadow-sm'
-                : 'text-slate-600 dark:text-slate-300 hover:bg-cream-100 dark:hover:bg-navy-800'
-            }`}
-          >
-            <Support className="w-4 h-4 flex-shrink-0" />
-            <span className="truncate">
-              <span className="hidden sm:inline">تذاكر الدعم والاستفسارات</span>
-              <span className="sm:hidden">تذاكر الدعم</span>
-            </span>
-            {userTickets.length > 0 && (
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0 ${
-                activeMainTab === 'tickets'
-                  ? 'bg-white/20 text-white dark:bg-navy-900 dark:text-gold-300'
-                  : 'bg-cream-200 dark:bg-navy-800 text-slate-700 dark:text-slate-300'
-              }`}>
-                {userTickets.length}
-              </span>
-            )}
-          </button>
+        <div className="rounded-2xl border border-cream-200 dark:border-navy-800 bg-white dark:bg-navy-900 p-4 mb-6 text-sm text-navy-700 dark:text-cream-100">
+          هذه الصفحة للدعم والاستفسارات فقط. متابعة طلبات التوافق ومراحلها وتوجيهات الإدارة الخاصة بها موجودة في <Link to="/requests" className="underline font-bold">طلباتي</Link>.
         </div>
-
-        {/* TAB 1: Compatibility Requests & Admin Directives */}
-        {activeMainTab === 'requests' && (
-          <div className="space-y-4">
-            {requestsLoading ? (
-              <div className="text-center py-12 bg-white dark:bg-navy-900 rounded-3xl border border-cream-200 dark:border-navy-800">
-                <Clock className="w-8 h-8 text-gold-500 animate-spin mx-auto mb-2" />
-                <p className="font-cairo text-sm text-slate-500 dark:text-slate-400">جارٍ تحميل طلبات التوافق والتوجيهات الإدارية...</p>
-              </div>
-            ) : requests.length === 0 ? (
-              <div className="text-center py-12 px-4 bg-white dark:bg-navy-900 rounded-3xl border border-cream-200 dark:border-navy-800">
-                <HeartHandshake className="w-12 h-12 text-slate-300 dark:text-navy-600 mx-auto mb-3" />
-                <h3 className="font-cairo font-bold text-base text-navy-900 dark:text-cream-50 mb-1">لا توجد طلبات توافق نشطة حالياً</h3>
-                <p className="font-cairo text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-5 leading-relaxed">
-                  يمكنك استعراض الأعضاء المتوافقين معك وإرسال طلب توافق، وسيظهر هنا مسار التنسيق وتوجيهات الإدارة لطلبك.
-                </p>
-                <button
-                  onClick={() => navigate('/search')}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gold-gradient text-navy-900 font-cairo font-bold text-xs shadow-soft hover:shadow-gold transition-all cursor-pointer"
-                >
-                  <Sparkles className="w-4 h-4" /> استعراض الأعضاء والبحث
-                </button>
-              </div>
-            ) : (
-              requests.map((req) => {
-                const isSender = req.sender_id === activeUserId;
-                const otherPartyId = isSender ? req.receiver_id : req.sender_id;
-                const other = members.find((m) => m.id === otherPartyId);
-                const colors = other ? getGenderColors(other.gender) : getGenderColors('male');
-                const stConfig = stageLabels[req.journey_stage] || stageLabels.sent;
-                const inq = requestInquiries[req.id];
-                const adminMessages = inq?.messages?.filter((m: any) => m.sender_id === 'admin') || [];
-                const latestAdminMsg = adminMessages.length > 0 ? adminMessages[adminMessages.length - 1] : null;
-
-                return (
-                  <motion.div
-                    key={`chat-req-${req.id}`}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-white dark:bg-navy-900 rounded-3xl border border-cream-200/90 dark:border-navy-800 p-4 sm:p-5 shadow-soft hover:border-gold-300/80 transition-all group"
-                  >
-                    {/* Header */}
-                    <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
-                      <div className="flex items-center gap-3">
-                        <Link to={`/member/${otherPartyId}`} className="relative flex-shrink-0 group-hover:scale-105 transition-transform">
-                          <img
-                            src={getAvatar(other?.gender || 'male')}
-                            alt={other?.nickname || 'العضو'}
-                            className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl object-cover ring-2 ${colors.ring} ring-offset-1`}
-                          />
-                        </Link>
-                        <div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-cairo font-black text-sm sm:text-base text-navy-950 dark:text-cream-50">
-                              {other?.nickname || 'طرف التوافق'}
-                            </span>
-                            {other?.verified && <BadgeCheck className="w-4 h-4 text-emerald-500 flex-shrink-0" />}
-                            <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg bg-cream-100 dark:bg-navy-950 text-slate-600 dark:text-slate-300">
-                              #{req.id}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-400 mt-0.5 flex-wrap">
-                            <span>{other?.age ? `${other.age} سنة` : ''}</span>
-                            {other?.city && (
-                              <span className="flex items-center gap-0.5">
-                                <MapPin className="w-3 h-3" /> {other.city}
-                              </span>
-                            )}
-                            <span>· {isSender ? 'طلب أرسلته' : 'طلب وارد إليك'}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Stage Badge */}
-                      <span className={`text-[11px] font-cairo font-bold px-3 py-1 rounded-full border ${stConfig.color} flex-shrink-0`}>
-                        {stConfig.label}
-                      </span>
-                    </div>
-
-                    {/* Admin Guidance Box if present */}
-                    {latestAdminMsg && (
-                      <div className="mb-3.5 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-indigo-500/10 border border-emerald-500/30 dark:border-emerald-500/40 rounded-2xl p-3 sm:p-3.5 shadow-xs">
-                        <div className="flex items-center justify-between gap-2 mb-1.5 text-xs text-emerald-800 dark:text-emerald-300 font-cairo font-black flex-wrap">
-                          <span className="flex items-center gap-1.5">
-                            <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                            توجيه وإشعار من إدارة المنصة
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-normal">
-                            {new Date(latestAdminMsg.created_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                        <p className="text-xs font-cairo text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-line bg-white/80 dark:bg-navy-950/60 p-2.5 rounded-xl border border-emerald-100 dark:border-emerald-900/50">
-                          {latestAdminMsg.text}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Action buttons */}
-                    <div className="flex items-center gap-2 pt-1 border-t border-cream-100 dark:border-navy-800">
-                      <button
-                        onClick={() => navigate(`/journey/${req.id}`)}
-                        className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-2 sm:px-4 rounded-xl bg-navy-900 hover:bg-navy-800 text-white dark:bg-gold-gradient dark:text-navy-950 font-cairo font-bold text-xs transition-all shadow-xs cursor-pointer min-w-0"
-                      >
-                        <Sparkles className="w-3.5 h-3.5 text-gold-300 dark:text-navy-950 flex-shrink-0" />
-                        <span className="truncate">الانتقال إلى رحلة التوافق</span>
-                        <ArrowLeft className="w-3.5 h-3.5 rotate-180 flex-shrink-0" />
-                      </button>
-
-                    </div>
-                  </motion.div>
-                );
-              })
-            )}
-          </div>
-        )}
-
-        {/* TAB 2: Support Tickets */}
-        {activeMainTab === 'tickets' && (
           <div className="space-y-3">
             {userTickets.length === 0 ? (
               <div className="text-center py-12 bg-white dark:bg-navy-900 rounded-3xl border border-cream-200 dark:border-navy-800">
@@ -482,7 +216,6 @@ export default function AdminChat() {
               })
             )}
           </div>
-        )}
       </div>
 
       {/* New ticket modal */}
@@ -493,7 +226,7 @@ export default function AdminChat() {
             <input
               value={newSubject}
               onChange={(e) => setNewSubject(e.target.value)}
-              placeholder="موضوع الاستفسار أو طلب التنسيق"
+              placeholder="موضوع الاستفسار أو المشكلة"
               className="w-full px-4 py-3 rounded-xl bg-cream-50 dark:bg-navy-950 border-2 border-cream-200 dark:border-navy-800 focus:border-gold-500 focus:outline-none font-tajawal text-navy-900 dark:text-cream-50 text-right"
             />
           </div>

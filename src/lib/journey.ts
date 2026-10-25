@@ -148,6 +148,8 @@ export function isTerminal(stage: JourneyState): stage is JourneyTerminal {
 
 // ===== أدوات موحّدة لحساب المرحلة، الدور الحالي، والنص الواضح للواجهة =====
 export interface JourneyRequestLike {
+  frozen?: boolean;
+  source_type?: string;
   workflow?: JourneyWorkflow;
   created_at?: string;
   sender_final_paid?: boolean;
@@ -200,10 +202,19 @@ export function getJourneyStatusSummary(
   const party = req.sender_id === currentUserId ? 'sender' : 'receiver';
   const b = partyBalance(req, party);
   const result: JourneyStatusSummary = { actor: 'system', actorLabel: 'المتابعة عبر الإدارة', tone: 'waiting', title: STAGE_META[stage].title, description: STAGE_META[stage].whereYouAre, nextHint: STAGE_META[stage].whatsNext };
-  if (stage === 'sent') return { ...result, actor: party === 'receiver' ? 'me' : 'other', actorLabel: party === 'receiver' ? 'بانتظار قرارك' : 'بانتظار الرد', tone: party === 'receiver' ? 'urgent' : 'waiting', title: party === 'receiver' ? `وصلك طلب توافق من ${otherName}` : 'تم إرسال طلبك', description: 'القبول مبدئي ولا يضمن الخطبة أو الزواج.' };
-  if (stage === 'accepted') return { ...result, title: 'تمت الموافقة المبدئية بين الطرفين', description: b.review ? 'تراجع الإدارة الرصيد السابق قبل تحديد المطلوب منك. تواصل معها عبر واتساب.' : b.paid > 0 ? 'تم تسجيل دفعتك؛ تتابع الإدارة وضع الطرفين لبدء التنسيق.' : 'تواصل مع الإدارة عبر واتساب لسداد الدفعة الأولى واستكمال تنسيق التواصل.', nextHint: 'الانتقال إلى التنسيق باعتماد الإدارة.' };
-  if (stage === 'engagement') return { ...result, title: w.mahrConfirmed ? 'تم تأكيد تسليم المهر' : w.engagementConfirmed ? 'تمت الخطبة — بانتظار تأكيد تسليم المهر' : 'جارٍ متابعة الخطبة والمهر', description: w.mahrConfirmed && !b.review ? `المتبقي من رسوم المنصة: ${b.remaining} ريال. المتابعة والسداد عبر واتساب الإدارة.` : 'تتابع الإدارة المستجدات عبر واتساب وتوثّقها هنا.' };
-  if (stage === 'completed') return { ...result, tone: w.outcome === 'married' ? 'success' : 'neutral', title: ({ pending: 'بانتظار تأكيد نتيجة الزواج', married: 'تم تأكيد الزواج — بارك الله لكما', not_completed: 'لم تكتمل إجراءات الزواج', stopped: 'توقفت المتابعة', unconfirmed: 'تعذّر تأكيد النتيجة' })[w.outcome], description: 'نتيجة الزواج مستقلة عن اكتمال سداد رسوم المنصة.' };
+  if (req.frozen) return { ...result, title: 'المتابعة معلّقة مؤقتاً', actorLabel: 'بانتظار الإدارة', description: 'أوقفت الإدارة متابعة الطلب مؤقتاً. سجلات الرحلة والدفعات باقية، ولا يلزمك إجراء جديد الآن.', nextHint: 'يمكنك الاستفسار من الإدارة عن سبب التعليق واستئناف المتابعة.' };
+  if (stage === 'sent') return { ...result, actor: party === 'receiver' ? 'me' : 'other', actorLabel: party === 'receiver' ? 'قرارك مطلوب' : 'بانتظار الرد', tone: party === 'receiver' ? 'urgent' : 'waiting', title: party === 'receiver' ? `وصلك طلب توافق من ${otherName}` : 'طلبك بانتظار الموافقة المبدئية', description: party === 'receiver' ? 'راجع الملف ثم اختر القبول المبدئي أو الاعتذار. لا تُطلب رسوم قبل الموافقة.' : req.source_type === 'imported' ? 'تتواصل الإدارة مع الخطّابة للحصول على قبول صاحب البيانات أو رفضه، ثم توثّق القرار هنا.' : 'يراجع الطرف الآخر طلبك. ستظهر موافقته أو اعتذاره هنا بعد تسجيل القرار.', nextHint: 'بعد القبول: ترتيب الدفعة الأولى مع الإدارة عبر واتساب.' };
+  if (stage === 'accepted') {
+    const needsPayment = b.paid === 0 && b.remaining > 0 && b.initial > 0;
+    return { ...result, actor: needsPayment ? 'me' : 'system', actorLabel: needsPayment ? 'خطوتك الآن' : 'الإدارة تراجع', tone: needsPayment ? 'urgent' : 'waiting', title: needsPayment ? 'تمت الموافقة المبدئية — رتّب دفعتك الأولى' : 'تمت الموافقة المبدئية — بانتظار بدء التنسيق', description: needsPayment ? `تواصل عبر واتساب الإدارة لترتيب الدفعة الأولى المستهدفة: ${b.initial.toLocaleString('ar-SA')} ريال. تعتمد الإدارة المبلغ المستلم فعلياً.` : b.paid > 0 ? `تم تأكيد ${b.paid.toLocaleString('ar-SA')} ريال من دفعاتك. تراجع الإدارة وضع الطرفين لاعتماد التنسيق؛ لا تسدّد دفعة أولى جديدة دون توجيهها.` : 'تراجع الإدارة وضع الطرفين قبل اعتماد التنسيق. لا توجد دفعة أولى مطلوبة منك حالياً.', nextHint: 'التالي: التنسيق وتبادل بيانات أولياء الأمور باعتماد الإدارة، وليس تلقائياً عند الدفع.' };
+  }
+  if (stage === 'coordination') return { ...result, actorLabel: 'الإدارة تنسّق', title: w.contactShared ? 'تم توثيق تنسيق مشاركة بيانات التواصل' : 'جارٍ التنسيق بين الطرفين وأولياء الأمور', description: w.contactShared ? 'سجّلت الإدارة مشاركة البيانات بالموافقات اللازمة. تابع التواصل عبر واتساب وأبلغها بالمستجدات.' : 'تراجع الإدارة الموافقات وتنسّق مشاركة بيانات أولياء الأمور عبر واتساب. لا تظهر الأرقام داخل الموقع.', nextHint: 'التالي: متابعة الخطبة وتسليم المهر. لا يُطلب المتبقي قبل تأكيد تسليم المهر.' };
+  if (stage === 'engagement') {
+    const due = w.mahrConfirmed && b.remaining > 0;
+    return { ...result, actor: due ? 'me' : 'system', actorLabel: due ? 'المتبقي مستحق' : 'الإدارة تتابع', tone: due ? 'urgent' : 'waiting', title: due ? 'تم تأكيد تسليم المهر — أكمل المتبقي' : w.mahrConfirmed ? 'تم تأكيد المهر واكتمال رسومك' : w.engagementConfirmed ? 'تمت الخطبة — بانتظار تأكيد تسليم المهر' : 'متابعة الخطبة وتسليم المهر', description: due ? `المتبقي من رسومك ${b.remaining.toLocaleString('ar-SA')} ريال، بعد خصم الدفعات المؤكدة. تابع سداده عبر واتساب الإدارة.` : w.mahrConfirmed ? 'لا توجد رسوم متبقية عليك. تتابع الإدارة توثيق نتيجة الزواج بصورة مستقلة.' : 'أبلغ الإدارة بالمستجدات عبر واتساب لتوثيقها. لا يستحق المتبقي إلا بعد تأكيد تسليم المهر.', nextHint: 'التالي: توثيق نتيجة الزواج بعد التحقق منها. دفع الرسوم لا يثبت الزواج.' };
+  }
+  if (stage === 'completed') return { ...result, tone: w.outcome === 'married' ? 'success' : 'neutral', actorLabel: w.outcome === 'pending' ? 'بانتظار التأكيد' : 'نتيجة موثّقة', title: ({ pending: 'بانتظار تأكيد نتيجة الزواج', married: 'تم تأكيد الزواج — بارك الله لكما', not_completed: 'لم تكتمل إجراءات الزواج', stopped: 'توقفت المتابعة', unconfirmed: 'تعذّر تأكيد النتيجة' })[w.outcome], description: 'تسجّل الإدارة النتيجة بعد التحقق. النتيجة مستقلة عن الرسوم، وتبقى تفاصيل دفعاتك موضّحة أدناه.', nextHint: 'لأي تحديث أو تصحيح، تواصل مع الإدارة عبر واتساب.' };
+  if (stage === 'declined' || stage === 'cancelled') return { ...result, actorLabel: 'طلب منتهٍ', title: stage === 'declined' ? 'تم الاعتذار عن متابعة الطلب' : 'تم إلغاء الطلب', description: 'هذا الطلب غير نشط حالياً. يمكنك استكشاف ملفات أخرى، مع بقاء سجل المتابعة والدفعات المسجّلة.', nextHint: 'أي استفسار عن دفعات سابقة أو تصحيح الحالة يُراجع مع الإدارة، ولا تتم تسوية تلقائية.' };
   return result;
 }
 

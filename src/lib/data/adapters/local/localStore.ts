@@ -964,12 +964,13 @@ export async function getActionableRequestsCount(userId: string): Promise<number
   return d.requests.filter((r) => {
     if (r.sender_id !== userId && r.receiver_id !== userId) return false;
     if (r.journey_stage === 'declined' || r.journey_stage === 'cancelled' || r.journey_stage === 'completed') return false;
+    if (r.frozen) return false;
     const isSender = r.sender_id === userId;
-    const selfPaid = isSender ? r.sender_paid : r.receiver_paid;
-    if (r.journey_stage === 'sent') return !isSender;
-    if (r.journey_stage === 'accepted') return true;
-    if (r.journey_stage === 'seriousness') return !selfPaid;
-    if (displayStage(r.journey_stage) === 'engagement') return !!workflowOf(r).mahrConfirmed && partyBalance(r, isSender ? 'sender' : 'receiver').remaining > 0;
+    const balance = partyBalance(r, isSender ? 'sender' : 'receiver');
+    const stage = displayStage(r.journey_stage);
+    if (stage === 'sent') return !isSender;
+    if (stage === 'accepted') return balance.paid === 0 && balance.initial > 0 && balance.remaining > 0;
+    if (stage === 'engagement') return !!workflowOf(r).mahrConfirmed && balance.remaining > 0;
     return false;
   }).length;
 }
