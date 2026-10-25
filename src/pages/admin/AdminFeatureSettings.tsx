@@ -51,7 +51,6 @@ export default function AdminFeatureSettings() {
     enableWhoViewedMe,
     enableProfileBoosting,
     maxActiveRequests,
-    pendingRequestsExpiryDays,
     updateFeatureSettings,
     showToast,
   } = useApp();
@@ -62,7 +61,6 @@ export default function AdminFeatureSettings() {
   const [localWhoViewedMe, setLocalWhoViewedMe] = useState(enableWhoViewedMe);
   const [localBoosting, setLocalBoosting] = useState(enableProfileBoosting);
   const [localMaxRequests, setLocalMaxRequests] = useState(maxActiveRequests);
-  const [localExpiryDays, setLocalExpiryDays] = useState(pendingRequestsExpiryDays);
 
   const handleSave = () => {
     updateFeatureSettings({
@@ -71,7 +69,6 @@ export default function AdminFeatureSettings() {
       enableWhoViewedMe: localWhoViewedMe,
       enableProfileBoosting: localBoosting,
       maxActiveRequests: localMaxRequests,
-      pendingRequestsExpiryDays: localExpiryDays,
     });
     setSaved(true);
     showToast('تم حفظ إعدادات الميزات والمحددات بنجاح ✓', 'success');
@@ -154,21 +151,7 @@ export default function AdminFeatureSettings() {
                 <p className="text-[10px] text-slate-400 font-tajawal mt-1">الحد المسموح به لكل عضو في نفس الوقت</p>
               </div>
 
-              <div id="expiry-days-input-wrapper">
-                <label className={labelClass}>صلاحية الطلبات المعلقة (بالأيام)</label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="1"
-                    max="30"
-                    value={localExpiryDays}
-                    onChange={(e) => setLocalExpiryDays(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                    className={inputClass}
-                  />
-                  <div className="absolute left-3 top-3 text-[10px] text-slate-400 font-cairo">يوم</div>
-                </div>
-                <p className="text-[10px] text-slate-400 font-tajawal mt-1">إلغاء الطلب تلقائياً إذا لم يستجب المستلم</p>
-              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 font-cairo text-sm leading-7"><strong>متابعة الرحلة من الإدارة</strong><p>أُلغيت مهلات الإغلاق التلقائي القديمة. يحدد المسؤول الإجراء القادم وموعد متابعته داخل كل رحلة، ويعلّقها أو يغلقها مع توثيق السبب.</p></div>
             </div>
 
             <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-4 mt-3 flex gap-3">

@@ -1,8 +1,12 @@
 import { Link } from 'react-router-dom';
 import { Check, ShieldCheck, Star, MessageSquare, ArrowLeft } from 'lucide-react';
+import { useApp } from '../lib/AppContext';
 import { PLANS } from '../lib/data';
 
 export default function Plans() {
+  const { paymentSettings } = useApp();
+  const total = paymentSettings.journeyTotalFee ?? 2500;
+  const initial = paymentSettings.journeyDepositAmount ?? 500;
   return <div className="min-h-screen bg-cream-50" dir="rtl">
     <header className="bg-navy-gradient px-4 py-12 text-center text-white">
       <span className="inline-flex rounded-full bg-white/10 px-4 py-1.5 text-sm font-cairo">عضوية تناسب استخدامك</span>
@@ -23,7 +27,8 @@ export default function Plans() {
       </div>
       <section className="mt-6 rounded-2xl border border-sky-200 bg-sky-50 p-5">
         <h2 className="flex items-center gap-2 font-cairo font-bold text-navy-900"><MessageSquare className="h-5 w-5"/> رسوم الرحلة مستقلة عن العضوية</h2>
-        <p className="mt-2 text-sm font-tajawal text-navy-700">اشتراك توافق مميز يمنح مزايا البحث والطلبات وتمييز الملف. رسوم الجدية وأتعاب رحلة التوافق مستقلة، وتُراجع شروطها قبل السداد.</p>
+        <p className="mt-2 text-sm font-tajawal text-navy-700">اشتراك توافق مميز يمنح مزايا البحث والطلبات وتمييز الملف. رسوم رحلة التوافق مستقلة وعلى كل طرف، مسجّلاً أو مستورداً. السداد والتنسيق عبر واتساب الإدارة، وليسا ضمن شراء العضوية.</p>
+        <p className="mt-2 text-sm font-tajawal text-navy-700">الإجمالي الحالي لكل طرف: {total} ريال. الدفعة الأولى المستهدفة: {initial} ريال. يمكن للإدارة اعتماد دفعة جزئية؛ المتبقي عند تسليم المهر يساوي الإجمالي ناقص الدفعات المؤكدة. تُثبت الرسوم الخاصة بطلبك عند إنشائه، ولا تتغير تلقائياً بتغيير الأسعار العامة.</p>
       </section>
       <p className="mt-5 text-sm font-tajawal text-navy-600">رسوم رحلة التوافق منفصلة تمامًا؛ العضوية لا تعفي منها ولا تخصم منها.</p>
       <Link to="/search" className="mt-5 inline-flex gap-2 items-center text-sm font-cairo font-bold text-gold-700">تصفّح الأعضاء <ArrowLeft className="h-4 w-4"/></Link>

@@ -1,3 +1,4 @@
+import { displayStage, workflowOf, partyBalance, type JourneyWorkflow } from './journeyWorkflow';
 // ============================================================
 //  رحلة طلب التوافق — نظام موحّد (Single Source of Truth)
 //  يستبدل: RequestStatus + MediationStage + coordinationStep
@@ -26,11 +27,11 @@ export type JourneyState = JourneyStage | JourneyTerminal;
 
 // ===== ترتيب المراحل الرئيسية =====
 export const JOURNEY_STAGES: JourneyStage[] = [
-  'sent', 'accepted', 'seriousness', 'coordination', 'sharia_viewing', 'engagement', 'completed',
+  'sent', 'accepted', 'coordination', 'engagement', 'completed',
 ];
 
 export const STAGE_INDEX: Record<JourneyStage, number> = {
-  sent: 0, accepted: 1, seriousness: 2, coordination: 3, sharia_viewing: 4, engagement: 5, completed: 6,
+  sent: 0, accepted: 1, seriousness: 1, coordination: 2, sharia_viewing: 3, engagement: 3, completed: 4,
 };
 
 // ===== تعريف كل مرحلة (عنوان + وصف + أيقونة + لون + إجراء + شرح منبثق) =====
@@ -47,70 +48,17 @@ export interface StageMeta {
   whatsNext: string;       // ما المرحلة التالية
 }
 
+const meta = (key: JourneyState, step: number, title: string, icon: LucideIcon, accent: string, whereYouAre: string, whatToDo: string, whatsNext: string): StageMeta => ({ key, step, title, badge: title, icon, accent, whereYouAre, whatToDo, whatsNext });
 export const STAGE_META: Record<JourneyState, StageMeta> = {
-  sent: {
-    key: 'sent', step: 1, title: 'بانتظار القبول', badge: 'بانتظار الرد',
-    icon: Send, accent: 'gold',
-    whereYouAre: 'تم إرسال طلبك بنجاح! الطرف الآخر يستلم إشعاراً الآن وبانتظار قبوله.',
-    whatToDo: 'لا تحتاج لفعل أي شيء حالياً — سنُخطرك فوراً عندما يقرر الطرف الآخر الرد.',
-    whatsNext: 'إذا وافق الطرف الآخر، ينتقل الطلب مباشرة إلى مرحلة تأكيد الجدية والقبول.',
-  },
-  accepted: {
-    key: 'accepted', step: 2, title: 'تم القبول بفضل الله', badge: 'خطوتك التالية',
-    icon: HeartHandshake, accent: 'emerald',
-    whereYouAre: 'تم قبول طلب التوافق بفضل الله. تبدأ الآن خطوة سداد العربون من الطرفين.',
-    whatToDo: 'يسدّد كل طرف عربون المنصة بقيمة ٥٠٠ ريال. العربون غير مسترد بعد السداد.',
-    whatsNext: 'بعد سداد الطرفين، يستطيع كل طرف مشاركة معلومات التواصل التي يختارها بنفسه.',
-  },
-  seriousness: {
-    key: 'seriousness', step: 3, title: 'سداد العربون', badge: '٥٠٠ ريال لكل طرف',
-    icon: ShieldCheck, accent: 'amber',
-    whereYouAre: 'يسدّد كل طرف ٥٠٠ ريال مقابل خدمات المنصة وجهود التنسيق. يُدفع العربون مرة واحدة لهذا الطلب وهو غير مسترد.',
-    whatToDo: 'أكمل سداد عربونك، ثم انتظر سداد الطرف الآخر.',
-    whatsNext: 'بعد سداد الطرفين، تبدأ مرحلة مشاركة معلومات التواصل الاختيارية.',
-  },
-  coordination: {
-    key: 'coordination', step: 4, title: 'مشاركة التواصل', badge: 'بقرارك أنت',
-    icon: CalendarClock, accent: 'blue',
-    whereYouAre: 'يمكن لكل طرف كتابة معلومات التواصل التي يرغب في مشاركتها. لا تعرض المنصة أي رقم محفوظ في الحساب تلقائياً.',
-    whatToDo: 'اكتب المعلومات التي اخترت مشاركتها، راجعها جيداً، ثم اضغط «إرسال معلومات التواصل».',
-    whatsNext: 'بعد مشاركة الطرفين، يؤكد كل طرف استعداده للانتقال إلى نتيجة النظرة الشرعية.',
-  },
-  sharia_viewing: {
-    key: 'sharia_viewing', step: 5, title: 'نتيجة النظرة الشرعية', badge: 'قرار خاص وآمن',
-    icon: Eye, accent: 'indigo',
-    whereYouAre: 'بعد إتمام النظرة الشرعية، يسجّل كل طرف نتيجته بصورة مستقلة وخاصة.',
-    whatToDo: 'اختر «تم القبول بفضل الله» للاستمرار، أو «لم يُكتب النصيب» لإنهاء الرحلة باحترام.',
-    whatsNext: 'عند قبول الطرفين، تنتقل الرحلة إلى تأكيد تسليم المهر وسداد المتبقي.',
-  },
-  engagement: {
-    key: 'engagement', step: 6, title: 'تسليم المهر وإكمال الأتعاب', badge: 'الخطوة الأخيرة',
-    icon: Gem, accent: 'gold',
-    whereYouAre: 'تم القبول من الطرفين بفضل الله. بعد تسليم المهر يسدّد كل طرف المتبقي من أتعاب المنصة: ٢٠٠٠ ريال.',
-    whatToDo: 'أكد تسليم المهر ثم أكمل سداد المبلغ المتبقي. تنتظر الرحلة إتمام الطرفين لهذه الخطوة.',
-    whatsNext: 'بعد سداد الطرفين، تكتمل رحلة التوافق.',
-  },
-  completed: {
-    key: 'completed', step: 7, title: 'مكتمل ✅', badge: 'اكتملت الرحلة',
-    icon: PartyPopper, accent: 'emerald',
-    whereYouAre: 'اكتملت رحلة التوافق للزواج بنجاح! نسأل الله لكما حياة سعيدة مباركة.',
-    whatToDo: 'الرحلة مكتملة. بارك الله لكما وبارك عليكما وجمع بينكما في خير.',
-    whatsNext: 'تم توثيق زواجكما في المنصة. نسأل الله التوفيق والسعادة.',
-  },
-  declined: {
-    key: 'declined', step: -1, title: 'تم الاعتذار', badge: 'منتهٍ',
-    icon: XCircle, accent: 'rose',
-    whereYouAre: 'انتهت هذه الرحلة باعتذار لطيف من أحد الطرفين. الزواج قسمة ونصيب.',
-    whatToDo: 'لا تيأس! لكل شخص نصيبه. تصفّح أعضاء جدد وأرسل طلبات توافق للزواج جديدة.',
-    whatsNext: 'يمكنك بدء رحلة جديدة مع عضو آخر في أي وقت.',
-  },
-  cancelled: {
-    key: 'cancelled', step: -1, title: 'ملغى', badge: 'مؤرشف',
-    icon: Ban, accent: 'slate',
-    whereYouAre: 'تم إلغاء هذا الطلب (بسبب عدم السداد في الوقت المحدد أو بطلب من أحد الطرفين).',
-    whatToDo: 'يمكنك إرسال طلب توافق للزواج جديد لعضو آخر في أي وقت.',
-    whatsNext: 'لا يلزمك أي إجراء. ابدأ بحثاً جديداً.',
-  },
+  sent: meta('sent', 1, 'طلب التوافق', Send, 'gold', 'الطلب بانتظار القبول أو الاعتذار.', 'يرد صاحب الحساب، وللملف المستورد تتابع الإدارة القرار مع الخطّابة وصاحب البيانات.', 'الموافقة المبدئية والسداد.'),
+  accepted: meta('accepted', 2, 'الموافقة المبدئية والسداد', HeartHandshake, 'emerald', 'تمت الموافقة المبدئية بين الطرفين.', 'تواصل مع الإدارة عبر واتساب لسداد الدفعة الأولى. تسجّل الإدارة المبلغ المستلم فعلياً، ولو كان جزئياً.', 'تبدأ الإدارة التنسيق بعد مراجعة وضع الطرفين.'),
+  seriousness: meta('seriousness', 2, 'الموافقة المبدئية والسداد', ShieldCheck, 'amber', 'متابعة الدفعة الأولى عبر الإدارة.', 'تواصل عبر واتساب؛ لا يعتمد الإيصال وحده دون التحقق من وصول المبلغ.', 'التنسيق بقرار إداري، وليس تلقائياً بمجرد الدفع.'),
+  coordination: meta('coordination', 3, 'التنسيق وتبادل بيانات أولياء الأمور', CalendarClock, 'blue', 'جارٍ التنسيق وتبادل معلومات التواصل مع أولياء الأمور عبر الإدارة.', 'تابع عبر واتساب الإدارة. لا تُشارك بيانات التواصل إلا بالموافقات اللازمة.', 'متابعة الخطبة والمهر.'),
+  sharia_viewing: meta('sharia_viewing', 4, 'الخطبة والمهر', Users, 'indigo', 'متابعة نتيجة التعارف والخطبة عبر الإدارة.', 'أبلغ الإدارة بالمستجدات عبر واتساب.', 'تأكيد تسليم المهر واستكمال المتبقي.'),
+  engagement: meta('engagement', 4, 'الخطبة والمهر', Gem, 'gold', 'تتابع الإدارة الخطبة وتسليم المهر عبر واتساب.', 'عند تأكيد تسليم المهر يستحق المتبقي: إجمالي الرسوم ناقص الدفعات المؤكدة.', 'تسجيل نتيجة الزواج بصورة مستقلة عن السداد.'),
+  completed: meta('completed', 5, 'نتيجة الزواج', PartyPopper, 'emerald', 'تابع النتيجة التي أكّدتها الإدارة.', 'تسجيل اكتمال المرحلة لا يثبت الزواج دون تأكيد مستقل.', 'تبقى المستحقات والسجلات محفوظة.'),
+  declined: meta('declined', -1, 'تم الاعتذار', XCircle, 'rose', 'انتهى الطلب باعتذار.', 'تواصل مع الإدارة لأي متابعة مالية أو تصحيح.', 'يمكنك بدء طلب آخر.'),
+  cancelled: meta('cancelled', -1, 'ملغى', Ban, 'slate', 'توقفت إجراءات هذا الطلب.', 'المبالغ والسجل لا تُحذف عند الإغلاق.', 'يمكن للإدارة إعادة فتح الطلب مع توثيق السبب.'),
 };
 
 // ===== ألوان كل accent (للـ Tailwind — صريحة كي لا يُحذفها الـ purge) =====
@@ -141,33 +89,11 @@ export function getPrimaryAction(
   role: RequestRole,
   ctx: { selfPaid?: boolean; otherPaid?: boolean } = {},
 ): PrimaryAction {
-  switch (stage) {
-    case 'sent':
-      // المستقبِل لديه قرار القبول/الرفض، المرسِل ينتظر
-      return role === 'receiver'
-        ? { type: 'accept_decline', label: 'الرد على الطلب', hint: 'اقبل الطلب أو اعتذر بلطف' }
-        : { type: 'none', label: 'بانتظار الرد', hint: 'سنُشعرك فور رد الطرف الآخر' };
-    case 'accepted':
-      return { type: 'open_journey', label: 'سداد العربون', hint: '٥٠٠ ريال غير مستردة لكل طرف' };
-    case 'seriousness':
-      if (ctx.selfPaid && !ctx.otherPaid) {
-        return { type: 'none', label: 'بانتظار سداد الطرف الآخر', hint: 'أكملت السداد ✓' };
-      }
-      if (ctx.selfPaid && ctx.otherPaid) {
-        return { type: 'view_coordination', label: 'متابعة التواصل', hint: 'أكّد الطرفان الجدية' };
-      }
-      return { type: 'open_journey', label: 'سداد العربون', hint: 'سدّد ٥٠٠ ريال للمتابعة' };
-    case 'coordination':
-      return { type: 'view_coordination', label: 'مشاركة التواصل', hint: 'لن يظهر أي رقم إلا إذا أرسلته بنفسك' };
-    case 'sharia_viewing':
-      return { type: 'record_result', label: 'تسجيل نتيجة النظرة', hint: 'تم القبول بفضل الله أو لم يُكتب النصيب' };
-    case 'engagement':
-      return { type: 'open_journey', label: 'إكمال الأتعاب', hint: 'بعد تسليم المهر: ٢٠٠٠ ريال لكل طرف' };
-    case 'completed':
-      return { type: 'none', label: 'اكتملت الرحلة', hint: 'نسأل الله لكما التوفيق' };
-    default:
-      return { type: 'none', label: '', hint: '' };
-  }
+  if (stage === 'sent') return role === 'receiver'
+    ? { type: 'accept_decline', label: 'الرد على الطلب', hint: 'قبول أو اعتذار' }
+    : { type: 'none', label: 'بانتظار الرد', hint: 'تابع طلبك من الرحلة' };
+  if (isTerminal(stage)) return { type: 'none', label: 'انتهى الطلب', hint: 'المتابعة مع الإدارة' };
+  return { type: 'open_journey', label: 'متابعة الرحلة', hint: 'السداد والتنسيق عبر واتساب الإدارة' };
 }
 
 // ===== هل يتطلّب هذا الطلب إجراءً فورياً من المستخدم الحالي؟ =====
@@ -177,20 +103,8 @@ export function requiresMyAction(
   role: RequestRole,
   ctx: { selfPaid?: boolean; otherPaid?: boolean } = {},
 ): boolean {
-  switch (stage) {
-    case 'sent':
-      return role === 'receiver';            // طلب وارد ينتظر ردّي
-    case 'accepted':
-      return true;                            // عليّ سداد رسوم الجدية
-    case 'seriousness':
-      return !ctx.selfPaid;                   // لم أدفع بعد
-    case 'sharia_viewing':
-      return true;                            // عليّ تسجيل نتيجة النظرة
-    case 'engagement':
-      return true;                            // عليّ إتمام الملكة
-    default:
-      return false;                           // التنسيق/مكتمل/مؤرشف لا يتطلّب إجراءً
-  }
+  if (stage === 'sent') return role === 'receiver';
+  return (stage === 'accepted' || stage === 'seriousness') && !ctx.selfPaid;
 }
 
 // تصنيف نوع الإجراء المطلوب (للون الشريط الجانبي والشارة)
@@ -234,6 +148,10 @@ export function isTerminal(stage: JourneyState): stage is JourneyTerminal {
 
 // ===== أدوات موحّدة لحساب المرحلة، الدور الحالي، والنص الواضح للواجهة =====
 export interface JourneyRequestLike {
+  workflow?: JourneyWorkflow;
+  created_at?: string;
+  sender_final_paid?: boolean;
+  receiver_final_paid?: boolean;
   journey_stage: string;
   sender_id: string;
   receiver_id: string;
@@ -269,11 +187,7 @@ export function getJourneyStage(req: JourneyRequestLike, currentUserId: string):
     ? (req.journey_stage as JourneyState)
     : legacyToJourney(req.journey_stage);
 
-  if (baseStage === 'sharia_viewing') {
-    if (req.sender_viewing_result === 'success' && req.receiver_viewing_result === 'success') return 'engagement';
-  }
-
-  return baseStage;
+  return displayStage(baseStage) as JourneyState;
 }
 
 export function getJourneyStatusSummary(
@@ -282,147 +196,15 @@ export function getJourneyStatusSummary(
   otherName = 'الطرف الآخر',
 ): JourneyStatusSummary {
   const stage = getJourneyStage(req, currentUserId);
-  const isSender = req.sender_id === currentUserId;
-  const role: RequestRole = isSender ? 'sender' : 'receiver';
-  const selfPaid = isSender ? !!req.sender_paid : !!req.receiver_paid;
-  const otherPaid = isSender ? !!req.receiver_paid : !!req.sender_paid;
-  const meta = STAGE_META[stage];
-
-  if (stage === 'declined') {
-    return {
-      actor: 'none', actorLabel: 'منتهٍ', tone: 'danger',
-      title: 'تم الاعتذار عن هذا الطلب',
-      description: req.decline_reason ? `السبب: ${req.decline_reason}` : 'انتهت الرحلة باعتذار لطيف من أحد الطرفين. الزواج قسمة ونصيب.',
-      nextHint: 'لا تيأس — تصفّح أعضاء جدد وأرسل طلبات جديدة.',
-    };
-  }
-
-  if (stage === 'cancelled') {
-    return {
-      actor: 'none', actorLabel: 'مؤرشف', tone: 'neutral',
-      title: 'تم إلغاء هذا الطلب',
-      description: req.cancel_reason ? `السبب: ${req.cancel_reason}` : 'أُلغي الطلب. يمكنك بدء طلب جديد متى شئت.',
-      nextHint: 'ابدأ رحلة توافق للزواج جديدة في أي وقت.',
-    };
-  }
-
-  if (stage === 'completed') {
-    return {
-      actor: 'none', actorLabel: 'مكتمل ✅', tone: 'success',
-      title: '🎉 اكتملت الرحلة بنجاح!',
-      description: 'تم توثيق زواجكما في المنصة. بارك الله لكما وبارك عليكما.',
-      nextHint: meta.whatsNext,
-    };
-  }
-
-  if (stage === 'sent') {
-    if (role === 'receiver') {
-      return {
-        actor: 'me', actorLabel: '🔔 الدور عليك الآن', tone: 'urgent',
-        title: `وصلك طلب توافق من ${otherName}`,
-        description: 'راجع الملف الشخصي، ثم اختر قبول الطلب أو الاعتذار باحترام.',
-        nextHint: 'عند القبول تبدأ خطوة تأكيد الجدية للطرفين.',
-      };
-    }
-    return {
-      actor: 'other', actorLabel: '⏳ بانتظار الطرف الآخر', tone: 'waiting',
-      title: 'تم إرسال طلبك بنجاح',
-      description: `بانتظار رد ${otherName}. لا يوجد إجراء مطلوب منك الآن.`,
-      nextHint: 'سنرسل لك إشعاراً فور الرد.',
-    };
-  }
-
-  if (stage === 'accepted') {
-    return {
-      actor: 'both', actorLabel: '🎉 الخطوة التالية', tone: 'urgent',
-      title: 'تم القبول بفضل الله',
-      description: 'الخطوة التالية: يسدّد كل طرف عربون الجدية بقيمة ٥٠٠ ريال.',
-      nextHint: 'بعد سداد الطرفين، تبدأ مشاركة معلومات التواصل باختيار كل طرف.',
-    };
-  }
-
-  if (stage === 'seriousness') {
-    if (!selfPaid) {
-      return {
-        actor: 'me', actorLabel: '💳 الدور عليك', tone: 'urgent',
-        title: 'سداد العربون بانتظارك',
-        description: otherPaid
-          ? `أكمل ${otherName} السداد. سدّد عربونك (٥٠٠ ريال) للانتقال إلى مشاركة التواصل.`
-          : 'سدّد عربون المنصة بقيمة ٥٠٠ ريال. العربون غير مسترد بعد السداد.',
-        nextHint: 'بعد سداد الطرفين، يستطيع كل طرف مشاركة معلوماته باختياره.',
-      };
-    }
-    if (!otherPaid) {
-      return {
-        actor: 'other', actorLabel: '⏳ بانتظار الطرف الآخر', tone: 'waiting',
-        title: '✅ أكملت سدادك بنجاح!',
-        description: `بانتظار ${otherName} ليسدّد رسومه. سنُخطرك فور سداده.`,
-        nextHint: 'بعد سداد الطرفين تبدأ مرحلة مشاركة التواصل.',
-      };
-    }
-  }
-
-  if (stage === 'coordination') {
-    const femaleContactReady = !!(req.guardian_phone || req.contact_info);
-    const maleContactReady = !!req.male_phone;
-    if (!femaleContactReady || !maleContactReady) {
-      return {
-        actor: 'both', actorLabel: 'معلومات التواصل', tone: 'urgent',
-        title: 'أضف معلومات التواصل التي تختارها',
-        description: 'اكتب فقط المعلومات التي تريد مشاركتها. لن نعرض أي رقم من حسابك تلقائياً.',
-        nextHint: 'بعد مشاركة الطرفين، يؤكد كل طرف الانتقال إلى نتيجة النظرة الشرعية.',
-      };
-    }
-    if (!req.male_pledged || !req.female_pledged) {
-      return {
-        actor: 'both', actorLabel: 'بانتظار المشاركة', tone: 'waiting',
-        title: 'بانتظار معلومات التواصل',
-        description: 'لم يشارك الطرفان معلومات التواصل بعد.',
-        nextHint: 'تظهر المعلومات فقط بعد أن يكتبها صاحبها ويضغط إرسال.',
-      };
-    }
-    return {
-      actor: 'both', actorLabel: '✅ جاهز للتنسيق', tone: 'success',
-      title: 'اكتملت مشاركة التواصل',
-      description: 'يمكنكما الآن التنسيق، ثم تأكيد الانتقال إلى نتيجة النظرة الشرعية.',
-      nextHint: 'يلزم تأكيد الطرفين قبل الانتقال.',
-    };
-  }
-
-  if (stage === 'sharia_viewing') {
-    const myResult = isSender ? req.sender_viewing_result : req.receiver_viewing_result;
-    const otherResult = isSender ? req.receiver_viewing_result : req.sender_viewing_result;
-    if (myResult === 'success' && !otherResult) {
-      return {
-        actor: 'other', actorLabel: '⏳ بانتظار الطرف الآخر', tone: 'waiting',
-        title: 'تم حفظ نتيجتك',
-        description: `بانتظار ${otherName} ليسجّل نتيجته بصورة مستقلة.`,
-        nextHint: 'عند قبول الطرفين، تنتقل الرحلة إلى تسليم المهر وإكمال الأتعاب.',
-      };
-    }
-    return {
-      actor: 'me', actorLabel: '📝 سجّل نتيجتك', tone: 'urgent',
-      title: 'سجّل قرارك بعد النظرة الشرعية',
-      description: 'اختر «تم القبول بفضل الله» أو «لم يُكتب النصيب».',
-      nextHint: 'لن تُعرض نتيجتك للطرف الآخر قبل أن يسجّل نتيجته.',
-    };
-  }
-
-  if (stage === 'engagement') {
-    return {
-      actor: 'me', actorLabel: 'الخطوة الأخيرة', tone: 'urgent',
-      title: 'تم القبول بفضل الله',
-      description: 'بعد تسليم المهر، أكمل سداد المتبقي من أتعاب المنصة (٢٠٠٠ ريال).',
-      nextHint: 'تكتمل الرحلة بعد سداد الطرفين.',
-    };
-  }
-
-  return {
-    actor: 'system', actorLabel: 'متابعة', tone: 'neutral',
-    title: meta.title,
-    description: meta.whereYouAre,
-    nextHint: meta.whatsNext,
-  };
+  const w = workflowOf(req);
+  const party = req.sender_id === currentUserId ? 'sender' : 'receiver';
+  const b = partyBalance(req, party);
+  const result: JourneyStatusSummary = { actor: 'system', actorLabel: 'المتابعة عبر الإدارة', tone: 'waiting', title: STAGE_META[stage].title, description: STAGE_META[stage].whereYouAre, nextHint: STAGE_META[stage].whatsNext };
+  if (stage === 'sent') return { ...result, actor: party === 'receiver' ? 'me' : 'other', actorLabel: party === 'receiver' ? 'بانتظار قرارك' : 'بانتظار الرد', tone: party === 'receiver' ? 'urgent' : 'waiting', title: party === 'receiver' ? `وصلك طلب توافق من ${otherName}` : 'تم إرسال طلبك', description: 'القبول مبدئي ولا يضمن الخطبة أو الزواج.' };
+  if (stage === 'accepted') return { ...result, title: 'تمت الموافقة المبدئية بين الطرفين', description: b.review ? 'تراجع الإدارة الرصيد السابق قبل تحديد المطلوب منك. تواصل معها عبر واتساب.' : b.paid > 0 ? 'تم تسجيل دفعتك؛ تتابع الإدارة وضع الطرفين لبدء التنسيق.' : 'تواصل مع الإدارة عبر واتساب لسداد الدفعة الأولى واستكمال تنسيق التواصل.', nextHint: 'الانتقال إلى التنسيق باعتماد الإدارة.' };
+  if (stage === 'engagement') return { ...result, title: w.mahrConfirmed ? 'تم تأكيد تسليم المهر' : w.engagementConfirmed ? 'تمت الخطبة — بانتظار تأكيد تسليم المهر' : 'جارٍ متابعة الخطبة والمهر', description: w.mahrConfirmed && !b.review ? `المتبقي من رسوم المنصة: ${b.remaining} ريال. المتابعة والسداد عبر واتساب الإدارة.` : 'تتابع الإدارة المستجدات عبر واتساب وتوثّقها هنا.' };
+  if (stage === 'completed') return { ...result, tone: w.outcome === 'married' ? 'success' : 'neutral', title: ({ pending: 'بانتظار تأكيد نتيجة الزواج', married: 'تم تأكيد الزواج — بارك الله لكما', not_completed: 'لم تكتمل إجراءات الزواج', stopped: 'توقفت المتابعة', unconfirmed: 'تعذّر تأكيد النتيجة' })[w.outcome], description: 'نتيجة الزواج مستقلة عن اكتمال سداد رسوم المنصة.' };
+  return result;
 }
 
 // ===== رسوم السعي =====

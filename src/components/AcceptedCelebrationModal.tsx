@@ -55,7 +55,7 @@ export default function AcceptedCelebrationModal({
               >
                 <HeartHandshake className="w-9 h-9 text-emerald-600" />
               </motion.div>
-              <h3 className="font-cairo font-extrabold text-2xl text-white">تم القبول بفضل الله</h3>
+              <h3 className="font-cairo font-extrabold text-2xl text-white">تمت الموافقة المبدئية</h3>
               <p className="text-emerald-50 font-cairo text-sm mt-1">
                 <strong className="text-white">{memberName}</strong> قبِل طلب التوافق للزواج معك
               </p>
@@ -67,7 +67,7 @@ export default function AcceptedCelebrationModal({
                 ما هي خطوتك التالية؟
               </p>
 
-              {/* الخيار الأساسي: سداد العربون */}
+              {/* الخيار الأساسي: متابعة السداد عبر الإدارة */}
               <button
                 onClick={onProceed}
                 className="w-full bg-gold-gradient rounded-2xl p-4 flex items-center gap-3 transition-all hover:-translate-y-0.5 shadow-gold text-right"
@@ -76,9 +76,9 @@ export default function AcceptedCelebrationModal({
                   <ShieldCheck className="w-6 h-6" />
                 </div>
                 <div className="flex-1">
-                  <h4 className="font-cairo font-extrabold text-navy-900">سداد العربون</h4>
+                  <h4 className="font-cairo font-extrabold text-navy-900">متابعة السداد عبر الإدارة</h4>
                   <p className="text-xs text-navy-800/70 font-cairo">
-                    {settings.deposit_amount} ريال لكل طرف — غير مسترد بعد السداد
+                    {settings.deposit_amount} ريال دفعة أولى مستهدفة لكل طرف — المتابعة عبر واتساب
                   </p>
                 </div>
                 <ChevronLeft className="w-5 h-5 text-navy-900/60 flex-shrink-0" />

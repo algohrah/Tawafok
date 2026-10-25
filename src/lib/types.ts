@@ -1,3 +1,4 @@
+import type { JourneyWorkflow } from './journeyWorkflow';
 export interface AdminPermissions {
   manage_members: boolean;
   manage_requests: boolean;
@@ -390,6 +391,7 @@ export interface AdminMemberRow {
 }
 
 export interface JourneyRequest {
+  workflow?: JourneyWorkflow;
   id: number;
   request_number?: number;
   requestNumber?: number;

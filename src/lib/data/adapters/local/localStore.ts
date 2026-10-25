@@ -1,3 +1,5 @@
+import { createWorkflow, workflowOf, partyBalance, applyAdminJourneyCommand, displayStage } from '../../../journeyWorkflow';
+import type { JourneyWorkflow } from '../../../journeyWorkflow';
 import { memberPlan, dailyRequestLimit, requestDay } from '../../../../../shared/membership.js';
 import { DEMO_ADMIN_PASSWORD } from '../../../constants';
 // ============================================================
@@ -8,7 +10,6 @@ import { DEMO_ADMIN_PASSWORD } from '../../../constants';
 
 import { MEMBERS } from '../../../members';
 import type { Member } from '../../../members';
-import { INTEREST_REQUESTS } from '../../../data';
 import { normalizeNationality } from '../../optionNormalizer';
 
 const memoryStorage = new Map<string, string>();
@@ -233,6 +234,7 @@ export function markRequestNotificationsRead(requestId: number, userId?: string)
 
 // ===== الأنواع =====
 export interface LocalRequest {
+  workflow?: JourneyWorkflow;
   id: number;
   request_number?: number;          // الرقم التسلسلي المخصص للفئة (يبدأ من 1 للمسجلين ومن 1 للمستوردين تصاعدياً)
   source_type?: 'registered' | 'imported'; // نوع مصدر الطلب: أعضاء مسجلين أو وساطة مستوردين
@@ -345,215 +347,51 @@ const STORAGE_KEY = 'twafok_local_db_v4';
 
 // ===== بيانات البذرة (طلبات بمراحل مختلفة) =====
 function seedDB(): DB {
-  // تحويل بيانات الاهتمام التجريبية إلى تنسيق قاعدة بيانات الرحلات المحلية
-  const seededRequests: LocalRequest[] = INTEREST_REQUESTS.map((ir, idx) => {
-    let stage = 'sent';
-    let sender_paid = false;
-    let receiver_paid = false;
-    let sender_paid_at: string | null = null;
-    let receiver_paid_at: string | null = null;
-    let meeting_date: string | null = null;
-    let meeting_notes: string | null = null;
-    let decline_reason: string | null = null;
-    let cancel_reason: string | null = null;
-    let evaluation_result: string | null = null;
-    let evaluation_note: string | null = null;
+  return { requests: [], events: [], inquiryMessages: [], inquiryPackages: [], notifications: [], seq: 100 };
+}
 
-    if (ir.status === 'pending') stage = 'sent';
-    else if (ir.status === 'accepted_pending_payment') stage = 'accepted';
-    else if (ir.status === 'paid') {
-      sender_paid = ir.senderId === 'm2' ? true : false;
-      receiver_paid = ir.receiverId === 'm2' ? true : false;
-      if (!sender_paid && !receiver_paid) {
-        sender_paid = true;
-        receiver_paid = true;
-      }
-      sender_paid_at = new Date(Date.now() - 86400000 * 2).toISOString();
-      receiver_paid_at = new Date(Date.now() - 86400000 * 2).toISOString();
-      if ((ir as any).mediationStage === 'exchanging' || (ir as any).mediationStage === 'scheduling') {
-        stage = 'coordination';
-        meeting_date = (ir as any).meetingDate || null;
-        meeting_notes = (ir as any).meetingNotes || null;
-      } else if ((ir as any).mediationStage === 'evaluating') {
-        stage = 'sharia_viewing';
-        evaluation_result = (ir as any).evaluationResult || null;
-        evaluation_note = (ir as any).evaluationNote || null;
-      } else {
-        stage = 'seriousness';
-      }
-    } else if (ir.status === 'declined') {
-      stage = 'declined';
-      decline_reason = ir.declineReason || 'عدم توافق';
-    } else if (ir.status === 'completed') {
-      stage = 'completed';
-      evaluation_result = (ir as any).evaluationResult || 'success';
-      evaluation_note = (ir as any).evaluationNote || null;
-    } else if (ir.status === 'in_mediation') {
-      stage = 'coordination';
-      meeting_date = (ir as any).meetingDate || null;
-      meeting_notes = (ir as any).meetingNotes || null;
-    }
-
-    const isImported = (ir as any).sourceType === 'imported' || ir.senderId.startsWith('imp_') || ir.receiverId.startsWith('imp_');
-    const sourceType: 'registered' | 'imported' = isImported ? 'imported' : 'registered';
-
-    return {
-      id: idx + 1,
-      request_number: idx + 1,
-      source_type: sourceType,
-      sender_id: ir.senderId,
-      receiver_id: ir.receiverId,
-      journey_stage: stage,
-      message: ir.message || 'طلب توافق مرسل عبر الإدارة',
-      sender_paid,
-      receiver_paid,
-      sender_paid_at,
-      receiver_paid_at,
-      paid_at: sender_paid && receiver_paid ? new Date(Date.now() - 86400000 * 2).toISOString() : null,
-      meeting_date,
-      meeting_notes,
-      decline_reason,
-      cancel_reason,
-      evaluation_result,
-      evaluation_note,
-      admin_notes: ir.adminNotes || null,
-      created_at: new Date(ir.createdAt || Date.now()).toISOString(),
-      updated_at: new Date(ir.createdAt || Date.now()).toISOString(),
-    };
-  });
-
-  const events: LocalEvent[] = [];
-  seededRequests.forEach((r) => {
-    events.push({
-      id: seededRequests.length + r.id,
-      request_id: r.id,
-      actor_id: r.sender_id,
-      type: 'sent',
-      note: 'تم إرسال طلب الاهتمام',
-      created_at: r.created_at,
-    });
-    if (r.journey_stage !== 'sent' && r.journey_stage !== 'declined') {
-      events.push({
-        id: seededRequests.length * 2 + r.id,
-        request_id: r.id,
-        actor_id: r.receiver_id,
-        type: 'accept',
-        note: 'قبل الطلب وبدء الرحلة',
-        created_at: new Date(new Date(r.created_at).getTime() + 3600000).toISOString(),
-      });
-    }
-    if (r.sender_paid) {
-      events.push({
-        id: seededRequests.length * 3 + r.id,
-        request_id: r.id,
-        actor_id: r.sender_id,
-        type: 'pay_deposit',
-        note: 'تم سداد رسوم الجدية (المرسِل)',
-        created_at: r.sender_paid_at || r.updated_at,
-      });
-    }
-    if (r.receiver_paid) {
-      events.push({
-        id: seededRequests.length * 4 + r.id,
-        request_id: r.id,
-        actor_id: r.receiver_id,
-        type: 'pay_deposit',
-        note: 'تم سداد رسوم الجدية (المستقبِل)',
-        created_at: r.receiver_paid_at || r.updated_at,
-      });
-    }
-  });
-
-  return {
-    requests: seededRequests,
-    events,
-    inquiryMessages: [],
-    inquiryPackages: [],
-    notifications: [],
-    seq: seededRequests.length * 10,
+const JOURNEY_RESET_KEY = 'tawafok_journey_clean_start_v3';
+/** User-authorized deletion. Runs once per browser, before AppContext reads settings. No backups are created. */
+export function initializeCleanJourneyWorkflow(): void {
+  if (typeof window === 'undefined' || window.localStorage.getItem(JOURNEY_RESET_KEY) === 'done') return;
+  const storage = window.localStorage;
+  const keepUnrelatedTransactions = (key: string) => {
+    const parsed = JSON.parse(storage.getItem(key) || '[]');
+    if (!Array.isArray(parsed)) return;
+    const kept = parsed.filter((t: any) => t.type === 'subscription' || (!['deposit', 'final', 'inquiry', 'journey'].includes(t.type) && !t.request_id && !t.requestId && !['deposit', 'final_fee', 'inquiry'].includes(t.metadata?.paymentStage)));
+    storage.setItem(key, JSON.stringify(kept)); memoryStorage.set(key, JSON.stringify(kept));
   };
+  // If parsing/writing fails, do not mark complete and do not permit new writes on top of an incomplete reset.
+  const oldRaw = storage.getItem(STORAGE_KEY);
+  let unrelatedNotifications: any[] = [];
+  try { unrelatedNotifications = (JSON.parse(oldRaw || '{}').notifications || []).filter((n: any) => !n.request_id && !['request', 'match', 'inquiry'].includes(n.type)); } catch {}
+  const clean = seedDB(); clean.notifications = unrelatedNotifications;
+  storage.setItem(STORAGE_KEY, JSON.stringify(clean)); memoryStorage.set(STORAGE_KEY, JSON.stringify(clean)); db = clean;
+  keepUnrelatedTransactions('twafok_transactions_v1'); keepUnrelatedTransactions('twafok_transactions');
+  for (const key of ['twafok_local_db_v3', 'twafok_local_db_v2', 'twafok_local_db', 'twafok_requests', 'saved_interest_requests', 'saved_exempt_requests', 'user_deposit_quota', 'requests_last_seen', 'journey_settings', 'inquiry_settings', 'pending_requests_expiry_days']) {
+    storage.removeItem(key); memoryStorage.delete(key);
+  }
+  const adminNotices = JSON.parse(storage.getItem('saved_admin_notifications') || '[]');
+  if (Array.isArray(adminNotices)) {
+    const kept = adminNotices.filter((n: any) => !n.requestId && !n.request_id && !['request', 'journey', 'inquiry', 'match'].includes(n.type) && !String(n.link || n.href || '').includes('/journey/'));
+    storage.setItem('saved_admin_notifications', JSON.stringify(kept));
+  }
+  let payment: any = {};
+  try { payment = JSON.parse(storage.getItem('payment_settings') || '{}'); } catch {}
+  payment = { ...payment, journeyTotalFee: 2500, journeyDepositAmount: 500 };
+  storage.setItem('payment_settings', JSON.stringify(payment)); memoryStorage.set('payment_settings', JSON.stringify(payment));
+  storage.setItem(JOURNEY_RESET_KEY, 'done');
 }
 
 // ===== تحميل/حفظ =====
 let db: DB | null = null;
-
-function syncGlobalPayments(d: DB) {
-  if (!d || !d.requests) return;
-  // العربون مرتبط بطلب التوافق نفسه، ولا ينتقل تلقائياً إلى طلبات أخرى.
-  let changed = false;
-  d.requests.forEach((r) => {
-    if (r.sender_paid && r.receiver_paid && r.journey_stage === 'seriousness') {
-      r.journey_stage = 'coordination';
-      r.paid_at = r.paid_at || new Date().toISOString();
-      changed = true;
-    }
-  });
-  
-  if (changed) {
-    if (typeof window !== 'undefined') {
-      try { setLocalSetting(STORAGE_KEY, JSON.stringify(d)); } catch {}
-    }
-  }
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('storage', (event: StorageEvent) => { if (event.key === STORAGE_KEY) db = null; });
 }
 
-function autoProcessDeadlines(d: DB): boolean {
-  let changed = false;
-  if (!d.requests) return false;
-  
-  const now = new Date();
-  
-  for (const r of d.requests) {
-    if (r.journey_stage === 'accepted' || r.journey_stage === 'seriousness') {
-      // إذا كان الطرفان قد سددا الرسوم مسبقاً، فلا ينطبق عليهم الإغلاق التلقائي لعدم السداد
-      if (r.sender_paid && r.receiver_paid) {
-        continue;
-      }
-      
-      const targetDateStr = r.defer_date || r.deadline_date;
-      if (!targetDateStr) continue;
-      
-      const targetDate = new Date(targetDateStr);
-      const diffTime = targetDate.getTime() - now.getTime();
-      const remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      if (remainingDays <= 0) {
-        // انتهت المهلة! نقوم بإغلاق الطلب وتغيير الحالة إلى 'cancelled' مع كتابة السبب 'انتهت المهلة ولم يتم السداد'
-        r.journey_stage = 'cancelled';
-        r.cancel_reason = 'انتهت المهلة ولم يتم السداد';
-        r.updated_at = now.toISOString();
-        changed = true;
-        
-        // إخطار الطرفين
-        addNotification(d, r.sender_id, r.id, 'system', '⚠️ تم إغلاق الطلب تلقائياً لانتهاء مهلة سداد رسوم الجدية.');
-        addNotification(d, r.receiver_id, r.id, 'system', '⚠️ تم إغلاق الطلب تلقائياً لانتهاء مهلة سداد رسوم الجدية.');
-        
-        // تسجيل حدث
-        addEvent(d, r.id, 'system', 'deadline_expired', 'انتهت المهلة ولم يتم السداد وتأكيد الجدية');
-      } else if (remainingDays <= 7) {
-        // وقبل اغلاق الطلب ب ٧ ايام يعطيه كل يوم اشعار بالسداد قبل اغلاق الطلب
-        const reminderText = `⏳ متبقي ${remainingDays} أيام على انتهاء مهلة سداد رسوم الجدية قبل إغلاق الطلب.`;
-        
-        // التحقق من وجود إشعار لنفس اليوم والطلب في صندوق الإشعارات لتجنب التكرار والسبام
-        const senderAlreadyNotified = d.notifications?.some(
-          n => n.request_id === r.id && n.user_id === r.sender_id && n.text.includes(`متبقي ${remainingDays} أيام`)
-        );
-        const receiverAlreadyNotified = d.notifications?.some(
-          n => n.request_id === r.id && n.user_id === r.receiver_id && n.text.includes(`متبقي ${remainingDays} أيام`)
-        );
-        
-        if (!r.sender_paid && !senderAlreadyNotified) {
-          addNotification(d, r.sender_id, r.id, 'system', reminderText);
-          changed = true;
-        }
-        if (!r.receiver_paid && !receiverAlreadyNotified) {
-          addNotification(d, r.receiver_id, r.id, 'system', reminderText);
-          changed = true;
-        }
-      }
-    }
-  }
-  return changed;
-}
+// Workflow v3: no automatic advancement/cancellation based on old flags or deadlines.
+function syncGlobalPayments(_d: DB) {}
+function autoProcessDeadlines(_d: DB): boolean { return false; }
 
 export function isImportedRequestOrMember(senderId: string, receiverId: string, explicitSourceType?: string): boolean {
   if (explicitSourceType === 'imported') return true;
@@ -686,6 +524,7 @@ function normalizeRequestIds(d: DB): boolean {
 }
 
 function load(): DB {
+  initializeCleanJourneyWorkflow();
   if (db) return db;
   if (typeof window !== 'undefined') {
     try {
@@ -697,7 +536,13 @@ function load(): DB {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed) {
-          db = parsed;
+          db = parsed as DB;
+          const validRequests = (Array.isArray(db.requests) ? db.requests : []).filter(r => r?.workflow?.version === 3);
+          const ids = new Set(validRequests.map(r => r.id));
+          db.requests = validRequests;
+          db.events = (db.events || []).filter(e => ids.has(e.request_id));
+          db.inquiryMessages = (db.inquiryMessages || []).filter(m => ids.has(m.request_id) && m.sender_id === 'admin');
+          db.inquiryPackages = [];
           // ترقية: ضمان وجود المصفوفات لجميع الحقول لتجنب أي انهيار أو كراش
           if (!db.notifications) db.notifications = [];
           if (!db.inquiryMessages) db.inquiryMessages = [];
@@ -729,14 +574,16 @@ function getNextRequestId(d: DB): number {
   return maxReqId + 1;
 }
 
-function save() {
-  if (db && typeof window !== 'undefined') {
-    try {
-      setLocalSetting(STORAGE_KEY, JSON.stringify(db));
-      window.dispatchEvent(new Event('storage'));
-      window.dispatchEvent(new CustomEvent('twafok_notification_update'));
-    } catch { /* تجاهل */ }
-  }
+function save(): boolean {
+  if (!db || typeof window === 'undefined') return false;
+  try {
+    const encoded = JSON.stringify(db);
+    window.localStorage.setItem(STORAGE_KEY, encoded);
+    memoryStorage.set(STORAGE_KEY, encoded);
+    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new CustomEvent('twafok_notification_update'));
+    return true;
+  } catch { return false; }
 }
 
 function nextId(): number {
@@ -777,55 +624,44 @@ export async function getMembers() {
 }
 
 // ===== الطلبات =====
+// This remains a local adapter, not a substitute for server authorization.
+function canManageJourneyLocally(): boolean {
+  if (getLocalSetting('twafok_demo_admin') !== 'true') return false;
+  try {
+    const admin = JSON.parse(getLocalSetting('twafok_current_admin_user') || 'null');
+    return !admin || (admin.status !== 'suspended' && (admin.role === 'super_admin' || admin.permissions?.manage_requests === true));
+  } catch { return false; }
+}
+function memberRequestView(r: LocalRequest): LocalRequest {
+  const copy = JSON.parse(JSON.stringify(r));
+  for (const key of ['admin_notes', 'meeting_notes', 'contact_info', 'contact_by', 'guardian_phone', 'guardian_name', 'guardian_relation', 'contact_note', 'contact_time', 'male_phone', 'male_name', 'male_relation', 'male_contact_time', 'male_contact_note']) delete copy[key];
+  if (copy.workflow) {
+    copy.workflow.audit = []; copy.workflow.adminNotes = ''; copy.workflow.decisionSource = '';
+    copy.workflow.assignedTo = ''; copy.workflow.nextAction = ''; copy.workflow.nextDueAt = '';
+    copy.workflow.contactRecipient = '';
+    copy.workflow.payments = copy.workflow.payments.map((p: any) => ({ ...p, reference: '', by: '', reason: '' }));
+  }
+  return copy;
+}
 export async function getRequests(userId?: string): Promise<LocalRequest[]> {
   await delay();
-  const d = load();
-  const sorted = [...d.requests].sort((a, b) => b.created_at.localeCompare(a.created_at));
-  
-  const liveMembers = getLiveMembers(true);
-  const adjusted = sorted.map((r) => {
-    const sender = liveMembers.find((m) => m.id === r.sender_id);
-    const receiver = liveMembers.find((m) => m.id === r.receiver_id);
-    const updated = { ...r };
-    if (sender && sender.sourceType === 'imported') {
-      updated.sender_paid = true;
-      updated.sender_paid_at = updated.sender_paid_at || updated.created_at;
-    }
-    if (receiver && receiver.sourceType === 'imported') {
-      updated.receiver_paid = true;
-      updated.receiver_paid_at = updated.receiver_paid_at || updated.created_at;
-    }
-    return updated;
-  });
-
-  if (!userId || !userId.trim()) return adjusted;
-  const cleanUid = userId.trim();
-  return adjusted.filter((r) => String(r.sender_id) === cleanUid || String(r.receiver_id) === cleanUid);
+  const sorted = [...load().requests].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  if (!userId || !userId.trim()) return sorted; // internal AppContext compatibility
+  const uid = userId.trim();
+  return sorted.filter(r => r.sender_id === uid || r.receiver_id === uid).map(memberRequestView);
 }
-
 export async function getRequest(id: number): Promise<LocalRequest | null> {
   await delay(60);
-  const d = load();
-  const r = d.requests.find((r) => r.id === id) || null;
+  const r = load().requests.find(r => r.id === id);
   if (!r) return null;
-
-  const liveMembers = getLiveMembers(true);
-  const sender = liveMembers.find((m) => m.id === r.sender_id);
-  const receiver = liveMembers.find((m) => m.id === r.receiver_id);
-  const updated = { ...r };
-  if (sender && sender.sourceType === 'imported') {
-    updated.sender_paid = true;
-    updated.sender_paid_at = updated.sender_paid_at || updated.created_at;
-  }
-  if (receiver && receiver.sourceType === 'imported') {
-    updated.receiver_paid = true;
-    updated.receiver_paid_at = updated.receiver_paid_at || updated.created_at;
-  }
-  return updated;
+  const uid = getCurrentUserId();
+  if (r.sender_id !== uid && r.receiver_id !== uid && !canManageJourneyLocally()) return null;
+  return memberRequestView(r);
 }
 
 export async function createRequest(senderId: string, receiverId: string, message: string, explicitSourceType?: 'registered' | 'imported') {
   await delay();
+  if (getCurrentUserId() !== senderId && !canManageJourneyLocally()) return { ok: false, error: 'غير مصرح بإرسال طلب باسم عضو آخر' };
   if (senderId === receiverId) {
     return { ok: false, error: 'لا يمكنك إرسال طلب توافق لنفسك' };
   }
@@ -867,7 +703,10 @@ export async function createRequest(senderId: string, receiverId: string, messag
   const nextUniqueId = getNextRequestId(d);
 
   const now = new Date().toISOString();
+  let financial = { journeyTotalFee: 2500, journeyDepositAmount: 500 };
+  try { financial = { ...financial, ...JSON.parse(getLocalSetting('payment_settings') || '{}') }; } catch {}
   const req: LocalRequest = {
+    workflow: createWorkflow(Number(financial.journeyTotalFee), Number(financial.journeyDepositAmount)),
     id: nextUniqueId,
     request_number: requestNumber,
     source_type: sourceType,
@@ -875,17 +714,17 @@ export async function createRequest(senderId: string, receiverId: string, messag
     receiver_id: receiverId,
     journey_stage: 'sent',
     message: 'طلب توافق جديد عبر المنصة',
-    sender_paid: isImported && sender?.sourceType === 'imported' ? true : false,
-    receiver_paid: isImported && receiver?.sourceType === 'imported' ? true : false,
-    sender_paid_at: isImported && sender?.sourceType === 'imported' ? now : null,
-    receiver_paid_at: isImported && receiver?.sourceType === 'imported' ? now : null,
+    sender_paid: false,
+    receiver_paid: false,
+    sender_paid_at: null,
+    receiver_paid_at: null,
     created_at: now,
     updated_at: now,
   };
   d.requests.unshift(req);
   addEvent(d, req.id, senderId, 'sent', 'تم إرسال طلب الاهتمام');
   addNotification(d, receiverId, req.id, 'request', 'وصلك طلب توافق جديد بانتظار قرارك');
-  save();
+  if (!save()) { d.requests = d.requests.filter(r => r.id !== req.id); d.events = d.events.filter(e => e.request_id !== req.id); d.notifications = d.notifications.filter(n => n.request_id !== req.id); return { ok: false, error: 'تعذر حفظ الطلب؛ تحقق من مساحة التخزين' }; }
   return { ok: true, data: req };
 }
 
@@ -925,439 +764,68 @@ export async function runRequestAction(
 ): Promise<{ ok: boolean; data?: LocalRequest; error?: string }> {
   await delay();
   const d = load();
-  const req = d.requests.find((r) => r.id === requestId);
-  if (!req) return { ok: false, error: 'الطلب غير موجود' };
-
+  const index = d.requests.findIndex(r => r.id === requestId);
+  if (index < 0) return { ok: false, error: 'الطلب غير موجود' };
+  const original = d.requests[index];
+  if (payload.expectedUpdatedAt && payload.expectedUpdatedAt !== original.updated_at) return { ok: false, error: 'تغير الطلب منذ فتحه. حدّث السجل قبل التعديل.' };
   const now = new Date().toISOString();
-  req.updated_at = now;
-  let evType = action, evNote = '';
-
-  switch (action) {
-    case 'accept': {
-      req.journey_stage = 'accepted';
-      const deadline = new Date();
-      deadline.setDate(deadline.getDate() + 15);
-      req.deadline_date = deadline.toISOString();
-      evNote = 'قبِل الطرف الآخر طلب الاهتمام';
-      break;
-    }
-    case 'decline':
-      req.journey_stage = 'declined';
-      req.decline_reason = payload.reason || 'عدم التوافق';
-      evNote = 'تم الاعتذار عن الطلب: ' + (payload.reason || '');
-      break;
-    case 'cancel':
-      req.journey_stage = 'cancelled';
-      req.cancel_reason = payload.reason || 'تم الإلغاء';
-      evNote = 'تم إلغاء الطلب: ' + (payload.reason || '');
-      break;
-    case 'skip_to_seriousness': {
-      req.journey_stage = 'seriousness';
-      evNote = 'تأكيد الرغبة والمضي لسداد رسوم الجدية';
-      break;
-    }
-    case 'defer_payment': {
-      const deferDate = payload.deferDate;
-      if (!deferDate) return { ok: false, error: 'تاريخ التأجيل مطلوب' };
-      req.defer_date = deferDate;
-      req.defer_by = actorId;
-      const actorName = getLiveMemberById(actorId)?.nickname || 'أحد الطرفين';
-      evNote = `أجّل ${actorName} سداد رسوم الجدية إلى ${new Date(deferDate).toLocaleDateString('ar-SA')}`;
-      evType = 'defer_payment';
-      
-      // إشعار للطرف الآخر
-      notifyOther(d, req, actorId, 'system', `أجّل ${actorName} موعد سداد رسوم الجدية إلى ${new Date(deferDate).toLocaleDateString('ar-SA')}`);
-      
-      // إضافة تذكير قبل السداد بيوم
-      const reminderDate = new Date(deferDate);
-      reminderDate.setDate(reminderDate.getDate() - 1);
-      addNotification(d, actorId, req.id, 'system', `تذكير: يتبقى يوم واحد على موعد سداد رسوم الجدية (${new Date(deferDate).toLocaleDateString('ar-SA')})`);
-      break;
-    }
-    case 'pay_deposit': {
-      const isSender = actorId === req.sender_id;
-      if (isSender) { req.sender_paid = true; req.sender_paid_at = now; }
-      else { req.receiver_paid = true; req.receiver_paid_at = now; }
-      if (req.journey_stage === 'accepted') req.journey_stage = 'seriousness';
-      if (req.sender_paid && req.receiver_paid) {
-        req.journey_stage = 'coordination';
-        req.paid_at = now;
-      }
-      evNote = 'تم سداد رسوم الجدية (' + (isSender ? 'المرسِل' : 'المستقبِل') + ')';
-      break;
-    }
-    case 'update_coordination':
-      if (payload.meetingDate !== undefined) req.meeting_date = payload.meetingDate;
-      if (payload.meetingNotes !== undefined) req.meeting_notes = payload.meetingNotes;
-      if (payload.advance) req.journey_stage = 'sharia_viewing';
-      evNote = 'تحديث تبادل التواصل وتنسيق الموعد';
-      evType = 'coordination';
-      break;
-    case 'submit_contact': {
-      const actor = getLiveMemberById(actorId);
-      if (!actor) return { ok: false, error: 'تعذّر التحقق من الحساب' };
-      
-      if (actor.gender === 'female') {
-        const phone = String(payload.guardianPhone || '').trim();
-        if (!phone) {
-          return { ok: false, error: 'رقم ولي الأمر مطلوب' };
-        }
-        req.guardian_phone = phone;
-        req.guardian_name = String(payload.guardianName || '').trim() || null;
-        req.guardian_relation = String(payload.guardianRelation || '').trim() || null;
-        req.contact_time = String(payload.contactTime || '').trim() || null;
-        req.contact_note = String(payload.contactNote || '').trim() || null;
-        req.contact_by = actorId;
-        
-        // تجميع نصّي للتوافق الرجعي
-        req.contact_info = [
-          req.guardian_name ? `${req.guardian_name}${req.guardian_relation ? ' (' + req.guardian_relation + ')' : ''}` : null,
-          `📱 ${phone}`,
-          req.contact_time ? `⏰ ${req.contact_time}` : null,
-          req.contact_note ? `📝 ${req.contact_note}` : null,
-        ].filter(Boolean).join(' — ');
-        evNote = 'شاركت الطرف الأنثى معلومات التواصل (رقم ولي الأمر) مباشرة';
-        
-        // إشعار للطرفين
-        const notifText = '🌸 شاركت الطرف الأنثى بيانات تواصل ولي أمرها.';
-        addNotification(d, req.sender_id, req.id, 'match', notifText);
-        addNotification(d, req.receiver_id, req.id, 'match', notifText);
-      } else {
-        const phone = String(payload.malePhone || '').trim();
-        if (!phone) {
-          return { ok: false, error: 'رقم الهاتف مطلوب' };
-        }
-        req.male_phone = phone;
-        req.male_name = String(payload.maleName || '').trim() || null;
-        req.male_relation = String(payload.maleRelation || '').trim() || null;
-        req.male_contact_time = String(payload.maleContactTime || '').trim() || null;
-        req.male_contact_note = String(payload.maleContactNote || '').trim() || null;
-        evNote = 'شارك الطرف الذكر معلومات التواصل الخاصة به مباشرة';
-        
-        // إشعار للطرفين
-        const notifText = '👔 قام الطرف الذكر بمشاركة بيانات التواصل الخاصة به بنجاح للبدء بالتنسيق.';
-        addNotification(d, req.sender_id, req.id, 'match', notifText);
-        addNotification(d, req.receiver_id, req.id, 'match', notifText);
-      }
-      
-      evType = 'coordination';
-      break;
-    }
-    case 'male_pledge': {
-      const actor = getLiveMemberById(actorId);
-      if (!actor) return { ok: false, error: 'تعذّر التحقق من الحساب' };
-      if (actor.gender === 'female') {
-        return { ok: false, error: 'هذا التعهّد خاص بالطرف الآخر.' };
-      }
-      req.male_pledged = true;
-      evNote = 'أقسم الطرف الذكر بعدم نشر المعلومات والتواصل بنية الزواج الجاد';
-      evType = 'coordination';
-      break;
-    }
-    case 'female_pledge': {
-      const actor = getLiveMemberById(actorId);
-      if (!actor) return { ok: false, error: 'تعذّر التحقق من الحساب' };
-      if (actor.gender === 'male') {
-        return { ok: false, error: 'هذا التعهّد خاص بالطرف الآخر.' };
-      }
-      req.female_pledged = true;
-      evNote = 'أقسمت الطرف الأنثى بعدم نشر معلومات التواصل والتواصل بنية الزواج الجاد';
-      evType = 'coordination';
-      break;
-    }
-    case 'report_contact_issue': {
-      const reason = payload.reason || 'الطرف الآخر لم يتجاوب';
-      const actorName = getLiveMemberById(actorId)?.nickname || 'أحد الطرفين';
-      evNote = `قوم ${actorName} بالإبلاغ عن مشكلة في التواصل: (${reason})`;
-      evType = 'support_report';
-      
-      // إضافة إشعار للإدارة والطرف الآخر لتنبيههم
-      addNotification(d, req.sender_id, req.id, 'admin', `تنبيه من الإدارة: قام ${actorName} برفع بلاغ عن وجود صعوبة في التواصل: ${reason}`);
-      addNotification(d, req.receiver_id, req.id, 'admin', `تنبيه من الإدارة: قام ${actorName} برفع بلاغ عن وجود صعوبة في التواصل: ${reason}`);
-      
-      // حفظ البلاغ محلياً لتتمكن الإدارة من معالجته
-      (req as any).contact_issue_reported = true;
-      (req as any).contact_issue_reason = reason;
-      (req as any).contact_issue_by = actorId;
-      (req as any).contact_issue_at = now;
-      break;
-    }
-    case 'advance_viewing':
-    case 'confirm_advance': {
-      const isSender = actorId === req.sender_id;
-      if (req.journey_stage !== 'coordination') {
-        return { ok: false, error: 'لا يمكن تأكيد الانتقال من هذه المرحلة' };
-      }
-      if (isSender) req.sender_stage_confirmed = true;
-      else req.receiver_stage_confirmed = true;
-      if (req.sender_stage_confirmed && req.receiver_stage_confirmed) {
-        req.journey_stage = 'sharia_viewing';
-        evNote = 'أكد الطرفان الانتقال إلى نتيجة النظرة الشرعية';
-      } else {
-        evNote = 'أكد أحد الطرفين استعداده للانتقال إلى نتيجة النظرة الشرعية';
-      }
-      evType = 'confirm_advance';
-      break;
-    }
-    case 'record_result': {
-      const isSender = actorId === req.sender_id;
-      // نتيجة النظرة: توافق -> الملكة، اعتذار -> مرفوض مع السبب
-      if (payload.result === 'failed') {
-        req.journey_stage = 'declined';
-        req.decline_reason = payload.note || payload.reason || 'تم الاعتذار بعد النظرة الشرعية';
-        req.evaluation_result = 'failed';
-        req.evaluation_note = payload.note || '';
-        evNote = 'الاعتذار بعد النظرة الشرعية: ' + (payload.note || payload.reason || '');
-        evType = 'decline';
-      } else {
-        if (isSender) {
-          req.sender_viewing_result = 'success';
-          req.sender_viewing_note = payload.note || '';
-        } else {
-          req.receiver_viewing_result = 'success';
-          req.receiver_viewing_note = payload.note || '';
-        }
-
-        // إذا وافق الطرفان كلاهما على التوافق، ننتقل بالطلب رسمياً لمرحلة الملكة
-        if (req.sender_viewing_result === 'success' && req.receiver_viewing_result === 'success') {
-          req.journey_stage = 'engagement';
-          req.evaluation_result = 'success';
-          req.evaluation_note = payload.note || '';
-          evNote = 'توافق ثنائي مبارك بعد النظرة الشرعية — الانتقال للملكة للطرفين 🎉';
-        } else {
-          evNote = 'تسجيل رغبة التوافق بعد النظرة الشرعية من قبل ' + (isSender ? 'المرسِل' : 'المستقبِل') + ' بانتظار الطرف الآخر';
-        }
-        evType = 'sharia_viewing';
-      }
-      break;
-    }
-    case 'pay_final_fee': {
-      if (req.journey_stage !== 'engagement') {
-        return { ok: false, error: 'سداد المتبقي غير متاح في هذه المرحلة' };
-      }
-      const isSender = actorId === req.sender_id;
-      if ((isSender && req.sender_final_paid) || (!isSender && req.receiver_final_paid)) {
-        return { ok: false, error: 'تم سداد المبلغ المتبقي لهذا الطلب مسبقاً' };
-      }
-      if (isSender) {
-        req.sender_final_paid = true;
-        req.sender_final_paid_at = now;
-      } else {
-        req.receiver_final_paid = true;
-        req.receiver_final_paid_at = now;
-      }
-      if (req.sender_final_paid && req.receiver_final_paid) {
-        req.journey_stage = 'completed';
-        req.evaluation_result = 'success';
-        req.evaluation_note = payload.note || 'اكتمل سداد الطرفين بعد تسليم المهر';
-        evNote = 'اكتمل سداد الطرفين وتمت رحلة التوافق بفضل الله';
-        evType = 'completed';
-      } else {
-        evNote = 'تم سداد المبلغ المتبقي بعد تسليم المهر';
-        evType = 'pay_final_fee';
-      }
-      break;
-    }
-    case 'set_stage':
-      if (['sent', 'accepted', 'seriousness', 'coordination', 'sharia_viewing', 'engagement', 'completed', 'declined', 'cancelled'].includes(payload.stage)) {
-        req.journey_stage = payload.stage;
-        if (payload.stage === 'cancelled') req.cancel_reason = payload.note || 'إلغاء إداري';
-        if (payload.stage === 'declined') req.decline_reason = payload.note || 'رفض إداري';
-      }
-      evNote = payload.note || ('تعديل إداري للمرحلة إلى ' + payload.stage);
-      break;
-    case 'admin_set_payments': {
-      if (payload.sender_paid !== undefined) {
-        req.sender_paid = !!payload.sender_paid;
-        if (req.sender_paid) req.sender_paid_at = now;
-        else req.sender_paid_at = null;
-      }
-      if (payload.receiver_paid !== undefined) {
-        req.receiver_paid = !!payload.receiver_paid;
-        if (req.receiver_paid) req.receiver_paid_at = now;
-        else req.receiver_paid_at = null;
-      }
-      if (req.sender_paid && req.receiver_paid && req.journey_stage === 'seriousness') {
-        req.journey_stage = 'coordination';
-        req.paid_at = now;
-      }
-      evNote = `تحديث حالة السداد إدارياً: المرسِل (${req.sender_paid ? 'مدفوع ✓' : 'لم يُدفع'}) — المستقبِل (${req.receiver_paid ? 'مدفوع ✓' : 'لم يُدفع'})`;
-      evType = 'system';
-      break;
-    }
-    case 'admin_set_pledges': {
-      if (payload.male_pledged !== undefined) req.male_pledged = !!payload.male_pledged;
-      if (payload.female_pledged !== undefined) req.female_pledged = !!payload.female_pledged;
-      evNote = `تحديث التعهدات إدارياً: الذكر (${req.male_pledged ? 'مكتمل ✓' : 'غير مكتمل'}) — الأنثى (${req.female_pledged ? 'مكتمل ✓' : 'غير مكتمل'})`;
-      evType = 'system';
-      break;
-    }
-    case 'admin_set_viewing_results': {
-      if (payload.sender_viewing_result !== undefined) req.sender_viewing_result = payload.sender_viewing_result;
-      if (payload.receiver_viewing_result !== undefined) req.receiver_viewing_result = payload.receiver_viewing_result;
-      if (req.sender_viewing_result === 'success' && req.receiver_viewing_result === 'success' && req.journey_stage === 'sharia_viewing') {
-        req.journey_stage = 'engagement';
-      }
-      evNote = `تحديث نتائج النظرة إدارياً: المرسِل (${req.sender_viewing_result === 'success' ? 'متوافق ✓' : req.sender_viewing_result === 'failed' ? 'معتذر' : 'قيد الانتظار'}) — المستقبِل (${req.receiver_viewing_result === 'success' ? 'متوافق ✓' : req.receiver_viewing_result === 'failed' ? 'معتذر' : 'قيد الانتظار'})`;
-      evType = 'system';
-      break;
-    }
-    case 'admin_set_contacts': {
-      if (payload.guardian_phone !== undefined) req.guardian_phone = payload.guardian_phone;
-      if (payload.guardian_name !== undefined) req.guardian_name = payload.guardian_name;
-      if (payload.guardian_relation !== undefined) req.guardian_relation = payload.guardian_relation;
-      if (payload.male_phone !== undefined) req.male_phone = payload.male_phone;
-      if (payload.male_name !== undefined) req.male_name = payload.male_name;
-      if (payload.contact_info !== undefined) req.contact_info = payload.contact_info;
-      evNote = `تحديث بيانات التواصل إدارياً للطرفين`;
-      evType = 'system';
-      break;
-    }
-    case 'freeze_request':
-      req.frozen = true;
-      req.frozen_reason = payload.note || 'تجميد مؤقت من الإدارة';
-      req.frozen_at = new Date().toISOString();
-      evNote = `تجميد الطلب: ${req.frozen_reason}`;
-      evType = 'system';
-      break;
-    case 'unfreeze_request':
-      req.frozen = false;
-      evNote = `إلغاء تجميد الطلب — عاد للمرحلة: ${stageTitle(req.journey_stage)}`;
-      evType = 'system';
-      break;
-    case 'reactivate':
-      // إعادة تفعيل طلب منتهٍ/ملغى لمرحلة سابقة
-      if (['sent', 'accepted', 'seriousness', 'coordination', 'sharia_viewing', 'engagement'].includes(payload.stage)) {
-        req.journey_stage = payload.stage;
-        req.decline_reason = null;
-        req.cancel_reason = null;
-        req.frozen = false;
-      }
-      evNote = `إعادة تفعيل الطلب للمرحلة: ${stageTitle(payload.stage)} — ${payload.note || ''}`;
-      evType = 'system';
-      break;
-    case 'swap_party':
-      // تبديل المرسِل أو المستقبِل بعضو آخر
-      if (payload.role === 'sender' && payload.newMemberId) {
-        const oldName = getLiveMemberById(req.sender_id)?.nickname || req.sender_id;
-        const newName = getLiveMemberById(payload.newMemberId)?.nickname || payload.newMemberId;
-        req.sender_id = payload.newMemberId;
-        evNote = `تبديل المرسِل من ${oldName} إلى ${newName} — ${payload.note || ''}`;
-      } else if (payload.role === 'receiver' && payload.newMemberId) {
-        const oldName = getLiveMemberById(req.receiver_id)?.nickname || req.receiver_id;
-        const newName = getLiveMemberById(payload.newMemberId)?.nickname || payload.newMemberId;
-        req.receiver_id = payload.newMemberId;
-        evNote = `تبديل المستقبِل من ${oldName} إلى ${newName} — ${payload.note || ''}`;
-      }
-      evType = 'system';
-      break;
-    default:
-      return { ok: false, error: 'إجراء غير معروف: ' + action };
+  const token = String(payload.commandId || ('cmd-' + Date.now() + '-' + Math.random().toString(36).slice(2)));
+  const snapshot = JSON.stringify(d);
+  let updated: LocalRequest;
+  let publicNote: string;
+  if (actorId === 'admin') {
+    if (!canManageJourneyLocally()) return { ok: false, error: 'صلاحية إدارة الرحلات مطلوبة' };
+    let adminName = String(payload.adminName || 'الإدارة');
+    try { const a = JSON.parse(getLocalSetting('twafok_current_admin_user') || 'null'); if (a?.name) adminName = a.name; } catch {}
+    // Administrative acceptance/decline are structured, auditable decisions too.
+    const command = action === 'accept' || action === 'decline' || action === 'cancel' ? 'set_stage' : action;
+    const commandPayload = action === 'accept' || action === 'decline' || action === 'cancel'
+      ? { ...payload, stage: action === 'accept' ? 'accepted' : action === 'decline' ? 'declined' : 'cancelled', note: payload.note || payload.reason || 'قرار إداري موثق عبر المتابعة' } : payload;
+    const result = applyAdminJourneyCommand(original, command, commandPayload, adminName, now, token);
+    if (!result.ok) return result;
+    if (result.duplicate) return { ok: true, data: original };
+    updated = result.data;
+    publicNote = action.includes('payment') || action === 'admin_reconcile_legacy' ? 'حدّثت الإدارة سجل رسوم الرحلة؛ راجع ملخصك المالي' : 'حدّثت الإدارة حالة متابعة الرحلة';
+  } else {
+    const uid = getCurrentUserId();
+    if (!uid || uid !== actorId || (original.sender_id !== uid && original.receiver_id !== uid)) return { ok: false, error: 'غير مصرح بهذا الإجراء' };
+    if (original.frozen) return { ok: false, error: 'الرحلة معلقة؛ تواصل مع الإدارة' };
+    if (!['accept', 'decline', 'cancel'].includes(action)) return { ok: false, error: 'السداد والتنسيق وتحديث النتائج عبر واتساب الإدارة فقط' };
+    if (original.journey_stage !== 'sent') return { ok: false, error: 'بعد القرار المبدئي تتم متابعة التعديلات مع الإدارة عبر واتساب' };
+    if (action !== 'cancel' && uid !== original.receiver_id) return { ok: false, error: 'الرد على الطلب للطرف المستقبِل فقط' };
+    if (action === 'cancel' && uid !== original.sender_id) return { ok: false, error: 'إلغاء الطلب المرسل لصاحبه فقط' };
+    const actor = getLiveMemberById(uid);
+    const other = getLiveMemberById(uid === original.sender_id ? original.receiver_id : original.sender_id);
+    if (actor?.sourceType === 'imported') return { ok: false, error: 'قرار الملف المستورد تسجله الإدارة بعد متابعة الخطّابة وصاحب البيانات' };
+    if (!actor || !other || [actor.status, other.status].some(st => ['banned', 'suspended', 'deleted'].includes(String(st)))) return { ok: false, error: 'أحد الحسابين غير متاح؛ تواصل مع الإدارة' };
+    updated = JSON.parse(JSON.stringify(original));
+    const memberWorkflow = JSON.parse(JSON.stringify(workflowOf(updated))) as JourneyWorkflow;
+    updated.workflow = memberWorkflow;
+    updated.journey_stage = action === 'accept' ? 'accepted' : action === 'decline' ? 'declined' : 'cancelled';
+    const reason = String(payload.reason || (action === 'accept' ? 'موافقة مبدئية من الحساب' : 'اعتذار عن المتابعة')).slice(0, 500);
+    if (action === 'decline') updated.decline_reason = reason;
+    if (action === 'cancel') updated.cancel_reason = reason;
+    memberWorkflow.decisionSource = 'قرار صاحب الحساب: ' + uid;
+    updated.updated_at = now;
+    memberWorkflow.audit.push({ id: token, at: now, by: uid, action, reason,
+      before: JSON.stringify({ stage: original.journey_stage }), after: JSON.stringify({ stage: updated.journey_stage }) });
+    publicNote = action === 'accept' ? 'تمت الموافقة المبدئية؛ تابع السداد والتنسيق عبر واتساب الإدارة' : 'انتهى الطلب باعتذار أو إلغاء';
   }
-
-  addEvent(d, requestId, actorId, evType, evNote);
-
-  // #9 توليد إشعارات حقيقية للطرف الآخر حسب الإجراء — تقود مباشرة للرحلة
-  const actorName = getLiveMemberById(actorId)?.nickname || 'الطرف الآخر';
-  switch (action) {
-    case 'accept':
-      notifyOther(d, req, actorId, 'request', `قبِل ${actorName} طلب توافقك — تابع رحلتك الآن`);
-      break;
-    case 'decline':
-      notifyOther(d, req, actorId, 'system', `اعتذر ${actorName} عن إكمال الطلب`);
-      break;
-    case 'cancel':
-      notifyOther(d, req, actorId, 'system', `تم إلغاء طلب التوافق من ${actorName}`);
-      break;
-    case 'pay_deposit':
-      if (req.journey_stage === 'coordination') {
-        addNotification(d, req.sender_id, req.id, 'match', 'اكتمل سداد العربون من الطرفين وبدأت مشاركة التواصل');
-        addNotification(d, req.receiver_id, req.id, 'match', 'اكتمل سداد العربون من الطرفين وبدأت مشاركة التواصل');
-      } else {
-        notifyOther(d, req, actorId, 'request', `سدّد ${actorName} العربون — بانتظار سدادك لبدء التواصل`);
-      }
-      break;
-    case 'submit_contact':
-      notifyOther(d, req, actorId, 'match', 'تمت مشاركة معلومات التواصل — يمكنك المتابعة');
-      break;
-    case 'advance_viewing':
-    case 'confirm_advance':
-      if (req.journey_stage === 'sharia_viewing') {
-        addNotification(d, req.sender_id, req.id, 'match', 'وافق الطرفان على الانتقال إلى نتيجة النظرة الشرعية');
-        addNotification(d, req.receiver_id, req.id, 'match', 'وافق الطرفان على الانتقال إلى نتيجة النظرة الشرعية');
-      } else {
-        notifyOther(d, req, actorId, 'match', 'أكد الطرف الآخر استعداده للانتقال إلى نتيجة النظرة الشرعية');
-      }
-      break;
-    case 'record_result':
-      if (payload.result !== 'failed') {
-        notifyOther(d, req, actorId, 'match', req.journey_stage === 'engagement'
-          ? 'تم القبول من الطرفين بفضل الله'
-          : 'سجّل الطرف الآخر نتيجة النظرة الشرعية');
-      } else {
-        notifyOther(d, req, actorId, 'system', 'تم الاعتذار بعد النظرة الشرعية');
-      }
-      break;
-    case 'pay_final_fee':
-      if (req.journey_stage === 'completed') {
-        addNotification(d, req.sender_id, req.id, 'match', 'اكتمل سداد الطرفين وتمت رحلة التوافق بفضل الله');
-        addNotification(d, req.receiver_id, req.id, 'match', 'اكتمل سداد الطرفين وتمت رحلة التوافق بفضل الله');
-      } else {
-        notifyOther(d, req, actorId, 'match', 'سدّد الطرف الآخر المبلغ المتبقي بعد تسليم المهر');
-      }
-      break;
-    case 'set_stage':
-      // إجراء إداري — أشعِر الطرفين بتحديث الإدارة لمرحلة الرحلة
-      if (actorId === 'admin') {
-        const adminText = payload.stage === 'cancelled'
-          ? 'قامت إدارة المنصة بإلغاء طلب الاهتمام'
-          : 'حدّثت إدارة المنصة مرحلة رحلتكما';
-        addNotification(d, req.sender_id, req.id, 'admin', adminText);
-        addNotification(d, req.receiver_id, req.id, 'admin', adminText);
-      }
-      break;
-    case 'freeze_request':
-      if (actorId === 'admin') {
-        addNotification(d, req.sender_id, req.id, 'admin', '⏸️ طلبك قيد تنسيق الإدارة — سيتم تحديثه قريباً');
-        addNotification(d, req.receiver_id, req.id, 'admin', '⏸️ طلبك قيد تنسيق الإدارة — سيتم تحديثه قريباً');
-      }
-      break;
-    case 'unfreeze_request':
-      if (actorId === 'admin') {
-        addNotification(d, req.sender_id, req.id, 'admin', '✅ تم استئناف رحلتكما بعد تنسيق الإدارة');
-        addNotification(d, req.receiver_id, req.id, 'admin', '✅ تم استئناف رحلتكما بعد تنسيق الإدارة');
-      }
-      break;
-    case 'reactivate':
-      if (actorId === 'admin') {
-        addNotification(d, req.sender_id, req.id, 'admin', '🔄 تمت إعادة تفعيل طلبك من قبل الإدارة');
-        addNotification(d, req.receiver_id, req.id, 'admin', '🔄 تمت إعادة تفعيل طلبك من قبل الإدارة');
-      }
-      break;
-    case 'swap_party':
-      if (actorId === 'admin') {
-        addNotification(d, req.sender_id, req.id, 'admin', '🔄 تم تبديل طرف في الطلب من قبل الإدارة');
-        addNotification(d, req.receiver_id, req.id, 'admin', '🔄 تم تبديل طرف في الطلب من قبل الإدارة');
-      }
-      break;
-    case 'update_coordination':
-      if (actorId === 'admin') {
-        addNotification(d, req.sender_id, req.id, 'match', 'حدّثت الإدارة تفاصيل موعد التوافق — اطّلع عليها');
-        addNotification(d, req.receiver_id, req.id, 'match', 'حدّثت الإدارة تفاصيل موعد التوافق — اطّلع عليها');
-      }
-      break;
-  }
-
-  save();
-  return { ok: true, data: { ...req } };
+  d.requests[index] = updated;
+  addEvent(d, requestId, actorId, action, publicNote);
+  addNotification(d, updated.sender_id, requestId, 'request', publicNote);
+  addNotification(d, updated.receiver_id, requestId, 'request', publicNote);
+  if (!save()) { db = JSON.parse(snapshot); return { ok: false, error: 'تعذر حفظ التعديل؛ تحقق من مساحة التخزين. لم يُعتمد الإجراء.' }; }
+  return { ok: true, data: actorId === 'admin' ? updated : memberRequestView(updated) };
 }
 
 // ===== سجل الأحداث =====
 export async function getEvents(requestId: number): Promise<LocalEvent[]> {
   await delay(60);
-  const d = load();
-  return d.events
-    .filter((e) => e.request_id === requestId && e.type !== 'inquiry_buy')
+  const d = load(), r = d.requests.find(r => r.id === requestId), uid = getCurrentUserId();
+  if (!r || (r.sender_id !== uid && r.receiver_id !== uid && !canManageJourneyLocally())) return [];
+  return d.events.filter(e => e.request_id === requestId && e.type !== 'inquiry_buy')
+    .map(e => ({ ...e, note: e.actor_id === 'admin' || e.type === 'coordination' ? 'تحديث في متابعة الرحلة من الإدارة' : 'تحديث حالة طلب التوافق' }))
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
 }
 
@@ -1487,7 +955,7 @@ export async function getActionableRequestsCount(userId: string): Promise<number
     if (r.journey_stage === 'sent') return !isSender;
     if (r.journey_stage === 'accepted') return true;
     if (r.journey_stage === 'seriousness') return !selfPaid;
-    if (r.journey_stage === 'sharia_viewing' || r.journey_stage === 'engagement') return true;
+    if (displayStage(r.journey_stage) === 'engagement') return !!workflowOf(r).mahrConfirmed && partyBalance(r, isSender ? 'sender' : 'receiver').remaining > 0;
     return false;
   }).length;
 }
@@ -2377,7 +1845,7 @@ export async function adminGetStats(): Promise<any> {
     if (r.sender_paid) depositsPaid++;
     if (r.receiver_paid) depositsPaid++;
   });
-  const revenue = depositsPaid * 500;
+  const revenue = d.requests.reduce((sum, r) => sum + partyBalance(r, 'sender').paid + partyBalance(r, 'receiver').paid, 0);
 
   const transactions = getTransactions() || [];
   const txRevenue = transactions
@@ -2433,33 +1901,12 @@ export async function adminGetStats(): Promise<any> {
 
 export async function adminGetRequestPayments(requestId: number): Promise<any[]> {
   await delay(40);
-  const d = load();
-  const req = d.requests.find((r) => r.id === requestId);
+  const req = load().requests.find(r => r.id === requestId);
   if (!req) return [];
-  const list = [];
-  if (req.sender_paid && req.sender_paid_at) {
-    list.push({
-      id: `pay-${requestId}-sender`,
-      request_id: requestId,
-      userId: req.sender_id,
-      userNickname: getLiveMemberById(req.sender_id)?.nickname || req.sender_id,
-      amount: 500,
-      status: 'success',
-      paid_at: req.sender_paid_at,
-    });
-  }
-  if (req.receiver_paid && req.receiver_paid_at) {
-    list.push({
-      id: `pay-${requestId}-receiver`,
-      request_id: requestId,
-      userId: req.receiver_id,
-      userNickname: getLiveMemberById(req.receiver_id)?.nickname || req.receiver_id,
-      amount: 500,
-      status: 'success',
-      paid_at: req.receiver_paid_at,
-    });
-  }
-  return list;
+  return workflowOf(req).payments.map(p => ({ ...p, request_id: requestId,
+    userId: p.party === 'sender' ? req.sender_id : req.receiver_id,
+    userNickname: getLiveMemberById(p.party === 'sender' ? req.sender_id : req.receiver_id)?.nickname,
+    status: 'success', paid_at: p.at }));
 }
 
 // ===== الكوبونات والمعاملات المالية =====
@@ -2523,7 +1970,7 @@ export function getTransactions(): any[] {
 }
 
 export function recordTransaction(tx: any) {
-  if (tx.type === 'inquiry') return false; // خدمة ملغاة؛ لا معاملات جديدة لها
+  if (['inquiry', 'deposit', 'final'].includes(tx.type)) return false; // خدمة ملغاة؛ لا معاملات جديدة لها
   const transactions = getTransactions();
   transactions.unshift({
     id: 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
@@ -2537,7 +1984,7 @@ export function updateTransactionStatus(id: string, status: string): boolean {
   const transactions = getTransactions();
   const idx = transactions.findIndex((t) => t.id === id || t.id?.toString() === id?.toString());
   if (idx !== -1) {
-    if (transactions[idx].type === 'inquiry' && status === 'completed') return false;
+    if (['inquiry', 'deposit', 'final'].includes(transactions[idx].type) && status === 'completed') return false;
     transactions[idx].status = status;
     try { setLocalSetting(TRANSACTIONS_KEY, JSON.stringify(transactions)); } catch { /* تجاهل */ }
     return true;
@@ -2569,22 +2016,7 @@ export async function adminApplyExemption(memberId: string, type: 'deposit' | 'b
   let exemptionApplied = false;
 
   if (type === 'deposit') {
-    d.requests.forEach((r) => {
-      if (r.sender_id === memberId) {
-        r.sender_paid = !!value;
-        if (value) r.sender_paid_at = r.sender_paid_at || new Date().toISOString();
-        exemptionApplied = true;
-      }
-      if (r.receiver_id === memberId) {
-        r.receiver_paid = !!value;
-        if (value) r.receiver_paid_at = r.receiver_paid_at || new Date().toISOString();
-        exemptionApplied = true;
-      }
-      if (r.sender_paid && r.receiver_paid && r.journey_stage === 'seriousness') {
-        r.journey_stage = 'coordination';
-        r.paid_at = r.paid_at || new Date().toISOString();
-      }
-    });
+    return false; // Record actual funds or a documented fee correction in the unified journey editor.
   } else if (type === 'badge') {
     return adminUpdateMember(memberId, { verified: !!value });
   }

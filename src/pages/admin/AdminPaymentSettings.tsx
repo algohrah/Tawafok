@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { CreditCard, Save, Check, HelpCircle, Bitcoin, Building2 } from 'lucide-react';
 import { useApp } from '../../lib/AppContext';
@@ -14,6 +15,7 @@ export default function AdminPaymentSettings() {
     updatePaypalSettings(paypalForm);
     const journeyDepositAmount = Math.max(0, Number(paymentsForm.journeyDepositAmount) || 0);
     const journeyTotalFee = Math.max(journeyDepositAmount, Number(paymentsForm.journeyTotalFee) || 0);
+    if (!Number.isFinite(journeyTotalFee) || !Number.isFinite(journeyDepositAmount) || Math.round(journeyTotalFee * 100) / 100 !== journeyTotalFee || Math.round(journeyDepositAmount * 100) / 100 !== journeyDepositAmount) { showToast('أدخل رسوماً صالحة بدقة هللتين كحد أقصى', 'error'); return; }
     const normalizedPayments = { ...paymentsForm, journeyDepositAmount, journeyTotalFee };
     setPaymentsForm(normalizedPayments);
     updatePaymentSettings(normalizedPayments);
@@ -53,7 +55,7 @@ export default function AdminPaymentSettings() {
             رسوم رحلة التوافق لكل طرف
           </h3>
           <p className="mt-1 font-tajawal text-xs leading-relaxed text-slate-500">
-            يُدفع العربون بعد قبول الطرف الآخر، ثم يُدفع المتبقي بعد نتيجة النظرة الشرعية وتسليم المهر.
+            رسوم مستقلة على الطرفين، مسجّلين أو مستوردين. السداد والتنسيق عبر واتساب الإدارة؛ تُسجَّل الدفعات الفعلية من لوحة الرحلة. هذه القيم للطلبات الجديدة فقط، ولا تغيّر الرسوم المثبتة للطلبات القائمة.
           </p>
         </div>
         <div className="grid gap-4 p-5 sm:grid-cols-3">
@@ -75,7 +77,7 @@ export default function AdminPaymentSettings() {
             </div>
           </div>
           <div>
-            <label className={labelClass}>العربون بعد القبول</label>
+            <label className={labelClass}>الدفعة الأولى المستهدفة بعد القبول</label>
             <div className="relative">
               <input
                 type="number"
@@ -94,7 +96,7 @@ export default function AdminPaymentSettings() {
               />
               <span className="absolute left-3 top-1/2 -translate-y-1/2 font-cairo text-xs text-slate-400">ريال</span>
             </div>
-            <p className="mt-1 font-tajawal text-[11px] text-rose-600">غير مسترد بعد السداد</p>
+            <p className="mt-1 font-tajawal text-[11px] text-rose-600">تُراجع شروط الاسترداد القائمة قبل السداد</p>
           </div>
           <div>
             <label className={labelClass}>المتبقي بعد تسليم المهر</label>
@@ -104,11 +106,12 @@ export default function AdminPaymentSettings() {
               </span>
               <span className="font-cairo text-xs text-emerald-600">ريال</span>
             </div>
-            <p className="mt-1 font-tajawal text-[11px] text-slate-400">يُحسب تلقائيًا</p>
+            <p className="mt-1 font-tajawal text-[11px] text-slate-400">مثال عند سداد كامل الدفعة الأولى؛ المتبقي الفعلي لكل طرف يُحسب من دفعاته المؤكدة.</p>
           </div>
         </div>
       </div>
 
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 font-cairo text-sm leading-7"><h3 className="font-bold">آلية رسوم الرحلة</h3><p>الدفعة الأولى المستهدفة ٥٠٠ من إجمالي ٢٥٠٠ لكل طرف. إن وصل ٣٠٠ تسجّله الإدارة كما هو؛ يبقى ٢٢٠٠ عند تأكيد تسليم المهر. لا تنتقل الرحلة تلقائياً بالدفع، ولا يُسجّل الزواج بمجرد اكتمال الرسوم.</p><p>رقم واتساب المستخدم هو رقم الإدارة المحدد في إعدادات التواصل. قنوات الدفع أدناه تبقى للعضوية والخدمات الأخرى، ولا تُعيد تفعيل الدفع الذاتي للرحلة.</p><Link to="/admin/journeys?tab=requests" className="underline font-bold">إدارة الرحلات والدفعات</Link></div>
       {/* PayPal */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-5">

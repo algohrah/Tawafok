@@ -24,11 +24,12 @@ const statusConfig = {
 
 const stageLabels: Record<string, { label: string; color: string }> = {
   sent: { label: 'بانتظار الموافقة المبدئية', color: 'text-amber-800 bg-amber-50 border-amber-200/80 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800' },
-  accepted: { label: 'تم القبول - بانتظار سداد الجدية', color: 'text-sky-800 bg-sky-50 border-sky-200/80 dark:bg-sky-950/30 dark:text-sky-300 dark:border-sky-800' },
-  seriousness: { label: 'سداد رسوم الجدية', color: 'text-purple-800 bg-purple-50 border-purple-200/80 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-800' },
-  coordination: { label: 'تنسيق اللقاء الشرعي', color: 'text-indigo-800 bg-indigo-50 border-indigo-200/80 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-indigo-800' },
-  sharia_viewing: { label: 'الرؤية واللقاء الشرعي', color: 'text-teal-800 bg-teal-50 border-teal-200/80 dark:bg-teal-950/30 dark:text-teal-300 dark:border-teal-800' },
-  completed: { label: 'مكتمل بتوافق مبارك 🌸', color: 'text-emerald-800 bg-emerald-50 border-emerald-200/80 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800' },
+  accepted: { label: 'الموافقة المبدئية والسداد عبر الإدارة', color: 'text-sky-800 bg-sky-50 border-sky-200/80 dark:bg-sky-950/30 dark:text-sky-300 dark:border-sky-800' },
+  seriousness: { label: 'الموافقة المبدئية والسداد عبر الإدارة', color: 'text-purple-800 bg-purple-50 border-purple-200/80 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-800' },
+  coordination: { label: 'التنسيق وتبادل بيانات أولياء الأمور', color: 'text-indigo-800 bg-indigo-50 border-indigo-200/80 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-indigo-800' },
+  sharia_viewing: { label: 'الخطبة والمهر', color: 'text-teal-800 bg-teal-50 border-teal-200/80 dark:bg-teal-950/30 dark:text-teal-300 dark:border-teal-800' },
+  engagement: { label: 'الخطبة والمهر', color: 'text-teal-800 bg-teal-50 border-teal-200 dark:bg-teal-950 dark:text-teal-300' },
+  completed: { label: 'مرحلة نتيجة الزواج', color: 'text-emerald-800 bg-emerald-50 border-emerald-200/80 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800' },
   declined: { label: 'تم الاعتذار بلطف', color: 'text-rose-800 bg-rose-50 border-rose-200/80 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-800' },
   cancelled: { label: 'ملغي', color: 'text-slate-800 bg-slate-100 border-slate-200/80 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-800' },
 };
@@ -97,7 +98,7 @@ export default function AdminChat() {
     if (partnerId) {
       const partner = members.find(m => m.id === partnerId);
       if (partner) {
-        const expectedSubject = `تنسيق اللقاء الشرعي - ${partner.nickname}`;
+        const expectedSubject = `التنسيق وتبادل بيانات أولياء الأمور - ${partner.nickname}`;
         // Try to find existing conversation
         const existing = supportTickets.find(
           t => t.userId === activeUserId && t.subject === expectedSubject
@@ -107,7 +108,7 @@ export default function AdminChat() {
           setActiveTicketId(existing.id);
         } else {
           const initialText = `السلام عليكم ورحمة الله وبركاته،
-يسعدنا في إدارة «توافق» البدء في تنسيق اللقاء الشرعي والتقريب المبارك بينكما.
+يسعدنا في إدارة «توافق» البدء في التنسيق وتبادل بيانات أولياء الأمور والتقريب المبارك بينكما.
 
 بطاقة العضو المطلوب التنسيق معه:
 • الاسم المستعار: ${partner.nickname}
@@ -121,7 +122,7 @@ export default function AdminChat() {
           const created = createSupportTicket(expectedSubject, 'استفسار عام', initialText, activeUserId);
           setActiveMainTab('tickets');
           setActiveTicketId(created.id);
-          showToast('تم فتح محادثة تنسيق اللقاء الشرعي مع الإدارة 🌸', 'success');
+          showToast('تم فتح محادثة التنسيق وتبادل بيانات أولياء الأمور مع الإدارة 🌸', 'success');
         }
       }
       searchParams.delete('partnerId');

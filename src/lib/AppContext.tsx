@@ -62,7 +62,7 @@ import { MEMBERS } from './members';
 import type { Member } from './members';
 import { ADMIN_MEMBERS, ADMIN_NOTIFICATIONS } from './admin-data';
 import type { AdminMember } from './admin-data';
-import { INTEREST_REQUESTS, FEE_CONFIG, type InterestRequest, type RequestStatus, type MediationStage } from './data';
+import { type InterestRequest, type RequestStatus, type MediationStage } from './data';
 
 export interface ExemptRequest {
   id: string;
@@ -527,7 +527,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [pendingRequestsExpiryDays, setPendingRequestsExpiryDays] = useState<number>(() => {
     if (typeof window !== 'undefined') {
-      const saved = dataService.db.settings.get('pending_requests_expiry_days');
+      const saved = null;
       return saved ? parseInt(saved, 10) : 7;
     }
     return 7;
@@ -658,7 +658,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Helper to synchronously load and map legacy requests from the real database (twafok_local_db_v4)
   const getMappedRequestsFromDB = useCallback((): InterestRequest[] => {
-    if (typeof window === 'undefined') return INTEREST_REQUESTS;
+    if (typeof window === 'undefined') return [];
     try {
       const raw = localStorage.getItem('twafok_local_db_v4');
       if (raw) {
@@ -708,11 +708,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     
     // Fallback to legacy settings key
-    const saved = dataService.db.settings.get('saved_interest_requests');
+    const saved = null;
     if (saved) {
       try { return JSON.parse(saved); } catch { /* ignore error */ }
     }
-    return INTEREST_REQUESTS;
+    return [];
   }, []);
 
   const [interestRequests, setInterestRequests] = useState<InterestRequest[]>(() => {
@@ -763,12 +763,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         } catch { /* ignore */ }
       }
       
-      const saved = dataService.db.settings.get('saved_interest_requests');
+      const saved = null;
       if (saved) {
         try { return JSON.parse(saved); } catch { /* ignore error */ }
       }
     }
-    return INTEREST_REQUESTS;
+    return [];
   });
 
   // Refresh helper
@@ -942,7 +942,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const handleRestore = () => {
       retryLoadMembers();
       try {
-        const savedReqs = dataService.db.settings.get('saved_interest_requests');
+        const savedReqs = null;
         if (savedReqs) setInterestRequests(JSON.parse(savedReqs));
 
         const savedPlans = dataService.db.settings.get('saved_plans');
@@ -966,7 +966,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const savedReports = dataService.db.settings.get('saved_member_reports_list');
         if (savedReports) setMemberReports(JSON.parse(savedReports));
 
-        const savedExempts = dataService.db.settings.get('saved_exempt_requests');
+        const savedExempts = null;
         if (savedExempts) setExemptRequests(JSON.parse(savedExempts));
       } catch (e) {
         console.error('Error refreshing AppContext on DB restore:', e);
@@ -1003,7 +1003,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isInitialized) return;
     if (typeof window !== 'undefined') {
-      dataService.db.settings.set('saved_interest_requests', JSON.stringify(interestRequests));
+      // Requests are persisted only through the unified journey store.
     }
   }, [interestRequests, isInitialized]);
 
@@ -1118,43 +1118,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [extraInterestsCount, isInitialized]);
 
-  const [depositQuota, setDepositQuota] = useState<{
-    hasActiveQuota: boolean;
-    remainingAttempts: number;
-    totalPaidAmount: number;
-    paidAt?: string;
-    selectedTierPrice?: number;
-  }>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = dataService.db.settings.get('user_deposit_quota');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          return {
-            hasActiveQuota: parsed.hasActiveQuota ?? false,
-            remainingAttempts: parsed.remainingAttempts ?? 5,
-            totalPaidAmount: parsed.totalPaidAmount ?? 0,
-            paidAt: parsed.paidAt,
-            selectedTierPrice: parsed.selectedTierPrice ?? 500,
-          };
-        } catch (e) {
-          console.warn('Failed parsing deposit quota', e);
-        }
-      }
-    }
-    return {
-      hasActiveQuota: false,
-      remainingAttempts: 5,
-      totalPaidAmount: 0,
-    };
-  });
-
-  useEffect(() => {
-    if (!isInitialized) return;
-    if (typeof window !== 'undefined') {
-      dataService.db.settings.set('user_deposit_quota', JSON.stringify(depositQuota));
-    }
-  }, [depositQuota, isInitialized]);
+  // Compatibility value only; journey funds are per-request ledger entries, not reusable credits.
+  const depositQuota = { hasActiveQuota: false, remainingAttempts: 0, totalPaidAmount: 0 };
+  const setDepositQuota = useCallback((_value: any) => { showToast('أرصدة الرحلة العامة ملغاة؛ استخدم سجل دفعات الطلب', 'info'); }, [showToast]);
 
   const [unlimitedInterestsUntil, setUnlimitedInterestsUntil] = useState<number>(() => {
     if (typeof window !== 'undefined') {
@@ -1890,37 +1856,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Wallet & Exemption system
   const [exemptRequests, setExemptRequests] = useState<ExemptRequest[]>(() => {
     if (typeof window !== 'undefined') {
-      const saved = dataService.db.settings.get('saved_exempt_requests');
+      const saved = null;
       if (saved) {
         try { return JSON.parse(saved); } catch { /* ignore error */ }
       }
     }
-    return [
-      {
-        id: 'ex1',
-        requestId: 'ir4',
-        userId: 'm3',
-        userNickname: 'أبو عبدالله',
-        reason: 'أواجه صعوبة مالية مؤقتة وأتمنى تخفيض الرسوم أو إعفائي لتأكيد جديتي.',
-        status: 'pending',
-        createdAt: Date.now() - 3600000 * 12,
-      }
-    ];
+    return [];
   });
 
-  // جلب طلبات الإعفاء من جدول exemption_requests الحقيقي عند الإقلاع
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.location.pathname.startsWith('/admin')) return;
-    let mounted = true;
-    fetch('/api/exemptions')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((rows) => {
-        if (!mounted || !Array.isArray(rows) || rows.length === 0) return;
-        setExemptRequests(rows);
-      })
-      .catch(() => undefined);
-    return () => { mounted = false; };
-  }, []);
+  // Old exemption requests were explicitly cleared; administration adjusts current request terms with an audit reason.
+
 
   // ========== SYNC AND INITIALIZE SETTINGS FROM CLOUD ==========
   useEffect(() => {
@@ -1946,7 +1891,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (savedAdminMembers) {
           try { setAdminMembers(JSON.parse(savedAdminMembers)); } catch {}
         }
-        const savedRequests = dataService.db.settings.get('saved_interest_requests');
+        const savedRequests = null;
         if (savedRequests) {
           try { setInterestRequests(JSON.parse(savedRequests)); } catch {}
         }
@@ -1986,7 +1931,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (savedExtraInterests) {
           try { setExtraInterestsCount(Number(savedExtraInterests)); } catch {}
         }
-        const savedDepositQuota = dataService.db.settings.get('user_deposit_quota');
+        const savedDepositQuota = null;
         if (savedDepositQuota) {
           try { setDepositQuota(JSON.parse(savedDepositQuota)); } catch {}
         }
@@ -2002,7 +1947,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (savedReports) {
           try { setReports(JSON.parse(savedReports)); } catch {}
         }
-        const savedExempts = dataService.db.settings.get('saved_exempt_requests');
+        const savedExempts = null;
         if (savedExempts) {
           try { setExemptRequests(JSON.parse(savedExempts)); } catch {}
         }
@@ -2018,158 +1963,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isInitialized) return;
     if (typeof window !== 'undefined') {
-      dataService.db.settings.set('saved_exempt_requests', JSON.stringify(exemptRequests));
+      // Legacy exemptions are not persisted in the clean workflow.
     }
   }, [exemptRequests, isInitialized]);
 
-  const submitExemptRequest = useCallback((requestId: string, reason: string) => {
-    const newExempt: ExemptRequest = {
-      id: 'ex_' + Date.now(),
-      requestId,
-      userId: user.memberId || 'm2',
-      userNickname: user.profile.name,
-      reason,
-      status: 'pending',
-      createdAt: Date.now(),
-    };
-    setExemptRequests(prev => [newExempt, ...prev]);
-    // حفظ طلب الإعفاء في جدول exemption_requests الحقيقي
-    fetch('/api/exemptions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newExempt),
-    }).catch(() => undefined);
-
-    // Also update the interest request with exemption status
-    setInterestRequests(prev => prev.map(req => {
-      if (req.id === requestId) {
-        const isSender = req.senderId === (user.memberId || 'm2');
-        return {
-          ...req,
-          ...(isSender ? {
-            senderExemptionStatus: 'pending',
-            senderExemptionReason: reason,
-          } : {
-            receiverExemptionStatus: 'pending',
-            receiverExemptionReason: reason,
-          })
-        };
-      }
-      return req;
-    }));
-
-    showToast('تم تقديم طلب التسهيل المالي للإدارة بنجاح. سيتم مراجعته والرد عليك خلال 24 ساعة.', 'success');
-  }, [user, showToast]);
-
-  const adminProcessExemptRequest = useCallback((id: string, action: 'approve' | 'reject') => {
-    // مزامنة القرار مع جدول exemption_requests الحقيقي
-    fetch('/api/exemptions', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, status: action === 'approve' ? 'approved' : 'rejected' }),
-    }).catch(() => undefined);
-
-    setExemptRequests(prev => prev.map(ex => {
-      if (ex.id !== id) return ex;
-      
-      const updatedStatus = action === 'approve' ? 'approved' as const : 'rejected' as const;
-      
-      // Update corresponding interest request
-      setInterestRequests(currRequests => currRequests.map(req => {
-        if (req.id === ex.requestId) {
-          const isSender = req.senderId === ex.userId;
-          const updatedReq = {
-            ...req,
-            ...(isSender ? {
-              senderExemptionStatus: updatedStatus,
-              senderPaid: action === 'approve' ? true : req.senderPaid,
-              senderPaidAmount: action === 'approve' ? 0 : req.senderPaidAmount,
-              senderPaidAt: action === 'approve' ? new Date().toISOString() : req.senderPaidAt,
-              senderExempted: action === 'approve' ? true : false,
-            } : {
-              receiverExemptionStatus: updatedStatus,
-              receiverPaid: action === 'approve' ? true : req.receiverPaid,
-              receiverPaidAmount: action === 'approve' ? 0 : req.receiverPaidAmount,
-              receiverPaidAt: action === 'approve' ? new Date().toISOString() : req.receiverPaidAt,
-              receiverExempted: action === 'approve' ? true : false,
-            })
-          };
-
-          // Check if both paid
-          if (updatedReq.senderPaid && updatedReq.receiverPaid) {
-            updatedReq.status = 'paid';
-            updatedReq.paymentStatus = 'paid';
-            updatedReq.paidAt = new Date().toISOString();
-            updatedReq.mediationStage = 'scheduling';
-          }
-          return updatedReq;
-        }
-        return req;
-      }));
-
-      return { ...ex, status: updatedStatus };
-    }));
-
-    showToast(action === 'approve' ? 'تمت الموافقة على طلب الإعفاء وتفعيل الجدية مجاناً ✓' : 'تم رفض طلب الإعفاء المالي.', 'info');
+  const submitExemptRequest = useCallback((_requestId: string, _reason: string) => {
+    showToast('تواصل مع الإدارة عبر واتساب لمراجعة الرسوم أو الدفعة الجزئية', 'info');
   }, [showToast]);
 
-  const payInterestRequestFee = useCallback((requestId: string, isSender: boolean, pledgeAccepted: boolean) => {
-    if (!pledgeAccepted) {
-      showToast('يجب الموافقة على عهد الأمانة والجدية للمتابعة.', 'error');
-      return;
-    }
-
-    const feeAmount = 500; // Fixed fee
-
-    setInterestRequests(prev => prev.map(req => {
-      if (req.id === requestId) {
-        const updatedReq = {
-          ...req,
-          ...(isSender ? {
-            senderPaid: true,
-            senderPaidAmount: feeAmount,
-            senderPaidAt: new Date().toISOString(),
-          } : {
-            receiverPaid: true,
-            receiverPaidAmount: feeAmount,
-            receiverPaidAt: new Date().toISOString(),
-          })
-        };
-
-        // Check if both paid
-        if (updatedReq.senderPaid && updatedReq.receiverPaid) {
-          updatedReq.status = 'paid';
-          updatedReq.paymentStatus = 'paid';
-          updatedReq.paidAt = new Date().toISOString();
-          updatedReq.mediationStage = 'scheduling';
-        }
-        return updatedReq;
-      }
-      return req;
-    }));
-
-    showToast('تم تأكيد جديتك وسداد رسوم خدمة الوساطة بنجاح ✓', 'success');
+  const adminProcessExemptRequest = useCallback((_id: string, _action: 'approve' | 'reject') => {
+    showToast('طلبات الإعفاء القديمة ملغاة؛ أي تعديل مالي يُوثّق من إدارة الرحلة الجديدة', 'info');
   }, [showToast]);
-
-  const adminCancelAndRefund = useCallback((requestId: string, type: 'full' | 'partial') => {
-    setInterestRequests(prev => prev.map(req => {
-      if (req.id === requestId) {
-        return {
-          ...req,
-          status: 'cancelled' as const,
-          cancelReason: type === 'full' ? 'إلغاء لعدم السداد الثنائي أو بطلب الإدارة' : 'عدم توافق بعد بدء الوساطة',
-          refundPercentage: 0,
-        };
-      }
-      return req;
-    }));
-
-    showToast(
-      type === 'full'
-        ? 'تم إلغاء الطلب بنجاح. جميع الرسوم والمدفوعات غير مستردة نهائياً.'
-        : 'تم إنهاء الوساطة وإغلاق الطلب بنجاح. جميع الرسوم والمدفوعات غير مستردة نهائياً.',
-      'success'
-    );
+  const payInterestRequestFee = useCallback((_requestId: string, _isSender: boolean, _pledgeAccepted: boolean) => {
+    showToast('تابع السداد عبر واتساب الإدارة؛ تُسجّل الدفعة بعد التحقق من وصولها', 'info');
+  }, [showToast]);
+  const adminCancelAndRefund = useCallback((_requestId: string, _type: 'full' | 'partial') => {
+    showToast('استخدم إدارة الرحلة لإغلاق الطلب؛ التصحيحات المالية مستقلة وموثّقة', 'info');
   }, [showToast]);
 
   const login = (name: string, memberId: string = 'm2') => {
@@ -3167,116 +2976,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [showToast, adminMembers, members]);
 
   const adminUpdateInterestRequestStatus = useCallback(async (requestId: string, status: RequestStatus | 'accepted', declineReason?: string) => {
-    const targetStatus: RequestStatus = status === 'accepted' ? 'accepted_pending_payment' : status;
-    
-    // 1. Calculate compatibility if accepted
-    if (targetStatus === 'accepted_pending_payment') {
-      const req = interestRequests.find(r => r.id === requestId);
-      if (req) {
-        const partnerId = req.senderId === 'm2' ? req.receiverId : req.senderId;
-        const requester = members.find((m) => m.id === partnerId);
-        const targetMember = members.find((m) => m.id === 'm2');
-        
-        if (requester && targetMember) {
-          const weightCompat = calculateCompat(requester, targetMember);
-          showToast(`تم قياس وحساب التوافق الموزون للمعادلة الرياضية: ${weightCompat}% للطرفين`, 'success');
-          
-          setMembers((currMembers) =>
-            currMembers.map((m) =>
-              m.id === partnerId ? { ...m, matchScore: weightCompat } : m
-            )
-          );
-          setAdminMembers((currAdmin) =>
-            currAdmin.map((m) =>
-              m.id === partnerId ? { ...m, matchScore: weightCompat } : m
-            )
-          );
-        }
-      }
-    }
+    const map: Record<string, string> = { pending: 'sent', accepted: 'accepted', accepted_pending_admin: 'accepted', accepted_pending_payment: 'accepted', in_mediation: 'coordination', completed: 'completed', declined: 'declined', cancelled: 'cancelled' };
+    if (!map[status]) { showToast('سجّل المبلغ الفعلي من إدارة الرحلة؛ لا توجد علامة سداد يدوية بديلة', 'info'); return; }
+    const result = await dataService.db.runRequestAction(Number(requestId), 'set_stage', 'admin', { stage: map[status], note: declineReason || 'تحديث المرحلة من إدارة الطلبات', adminName: currentAdminName });
+    if (!result.ok) showToast(result.error || 'تعذر حفظ التعديل', 'error');
+  }, [showToast, currentAdminName]);
 
-    // 2. Sync with localStore database
-    const cleanId = typeof requestId === 'string' ? Number(requestId.replace(/\D/g, '')) : Number(requestId);
-    let dbSuccess = false;
-    if (!isNaN(cleanId) && cleanId > 0) {
-      if (targetStatus === 'accepted_pending_payment' || targetStatus === 'accepted_pending_admin') {
-        const res = await dataService.db.runRequestAction(cleanId, 'accept', 'admin');
-        dbSuccess = res.ok;
-      } else if (targetStatus === 'declined') {
-        const res = await dataService.db.runRequestAction(cleanId, 'decline', 'admin', { reason: declineReason || 'عدم التوافق' });
-        dbSuccess = res.ok;
-      } else if (targetStatus === 'cancelled') {
-        const res = await dataService.db.runRequestAction(cleanId, 'cancel', 'admin', { reason: declineReason || 'تم الإلغاء' });
-        dbSuccess = res.ok;
-      }
-    }
-
-    // 3. Fallback to manual state update if not in database (for legacy compat)
-    if (!dbSuccess) {
-      setInterestRequests((prevRequests) => {
-        return prevRequests.map((req) => {
-          if (req.id === requestId) {
-            const deadlineTime = targetStatus === 'accepted_pending_payment' 
-              ? new Date(Date.now() + 72 * 3600 * 1000).toISOString() 
-              : req.paymentDeadline;
-
-            return { 
-              ...req, 
-              status: targetStatus, 
-              ...(declineReason !== undefined ? { declineReason } : {}),
-              ...(targetStatus === 'accepted_pending_payment' ? { 
-                paymentStatus: 'waiting_for_payment' as const,
-                paymentDeadline: deadlineTime,
-                senderPaid: false,
-                receiverPaid: false,
-                attemptsCount: FEE_CONFIG.freeAttemptsAfterDeposit,
-              } : {}),
-              ...(targetStatus === 'paid' ? { 
-                paymentStatus: 'paid' as const,
-                paidAt: 'الآن',
-                mediationStage: 'scheduling' as MediationStage,
-              } : {}),
-              ...(targetStatus === 'in_mediation' ? { 
-                mediationStage: 'scheduling' as MediationStage,
-              } : {}),
-              ...(targetStatus === 'completed' ? { 
-                mediationStage: 'evaluating' as MediationStage,
-              } : {}),
-              ...(targetStatus === 'cancelled' ? { 
-                refundPercentage: req.mediationStage === 'evaluating' || req.status === 'in_mediation' 
-                  ? FEE_CONFIG.refundAfterMeeting 
-                  : FEE_CONFIG.refundBeforeMeeting,
-              } : {}),
-            };
-          }
-          return req;
-        });
-      });
-    }
-    
-    const statusLabels: Record<RequestStatus, string> = {
-      pending: 'قيد الانتظار',
-      accepted_pending_admin: 'مقبول وبانتظار موافقة الإدارة والتحقق ⏳',
-      accepted_pending_payment: 'تمت الموافقة وبانتظار سداد رسوم تأكيد الجدية ثنائياً 💳',
-      paid: 'تم السداد، جاهز للوساطة ✅',
-      in_mediation: 'الوساطة جارية 🤝',
-      completed: 'مكتمل 🎉',
-      declined: 'مرفوض',
-      cancelled: 'ملغى',
-    };
-    showToast(`تم تحديث حالة طلب الاهتمام: ${statusLabels[targetStatus]}`, 'info');
-  }, [interestRequests, members, calculateCompat, showToast]);
-
-  const adminUpdateInterestRequestDetails = useCallback((requestId: string, fields: Partial<InterestRequest>) => {
-    setInterestRequests((prevRequests) => {
-      return prevRequests.map((req) => {
-        if (req.id === requestId) {
-          return { ...req, ...fields };
-        }
-        return req;
-      });
-    });
-    showToast('تم حفظ تحديثات طلب الاهتمام والموعد بنجاح بنظام التوفيق والمطابقة ✓', 'success');
+  const adminUpdateInterestRequestDetails = useCallback((_requestId: string, _fields: Partial<InterestRequest>) => {
+    showToast('استخدم إدارة الرحلة الموحدة لحفظ التفاصيل مع سجل التعديلات', 'info');
   }, [showToast]);
 
   const sendInterestRequest = useCallback(async (memberId: string, messageText: string) => {

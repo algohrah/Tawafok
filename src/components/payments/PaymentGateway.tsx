@@ -131,6 +131,10 @@ export default function PaymentGateway({
   const needsReview = requiresOfflineReview && isOfflineMethod;
 
   const finalize = useCallback(async () => {
+    if (txType === 'deposit' || txType === 'final' || requestId) {
+      showToast('رسوم الرحلة تُتابع عبر واتساب الإدارة، وتُسجّل بعد التحقق من وصول المبلغ.', 'info');
+      return;
+    }
     if (title.includes('استفسار') || metadata?.paymentStage === 'inquiry' || metadata?.credits) {
       showToast('هذه الخدمة غير متاحة. تواصل مع الإدارة للمساعدة.', 'info');
       return;
