@@ -874,7 +874,7 @@ export async function createRequest(senderId: string, receiverId: string, messag
     sender_id: senderId,
     receiver_id: receiverId,
     journey_stage: 'sent',
-    message: (message || '').trim() || 'طلب توافق مرسل عبر الإدارة',
+    message: 'طلب توافق جديد عبر المنصة',
     sender_paid: isImported && sender?.sourceType === 'imported' ? true : false,
     receiver_paid: isImported && receiver?.sourceType === 'imported' ? true : false,
     sender_paid_at: isImported && sender?.sourceType === 'imported' ? now : null,
@@ -1357,177 +1357,52 @@ export async function getEvents(requestId: number): Promise<LocalEvent[]> {
   await delay(60);
   const d = load();
   return d.events
-    .filter((e) => e.request_id === requestId)
+    .filter((e) => e.request_id === requestId && e.type !== 'inquiry_buy')
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
 }
 
-// ===== باقة الاستفسار =====
-const INQUIRY_CREDITS = 20;
-const INQUIRY_PRICE = 100;
-
+// ===== توجيهات الإدارة فقط؛ مخطط الاستفسارات القديم محفوظ للتوافق والأرشفة =====
 export interface InquiryStateLocal {
   package: LocalInquiryPackage | null;
   remaining: number;
   messages: LocalInquiryMessage[];
   inquiry_started_by?: string | null;
 }
+const MEMBER_MESSAGING_REMOVED = 'المراسلة بين الأعضاء غير متاحة. تواصل مع الإدارة للمساعدة.';
 
+// قراءة الرصيد التاريخي لا تمنح حق شراء أو استهلاك جديد.
 export function getUserInquiryBalance(userId: string): number {
-  const d = load();
-  const userPkgs = d.inquiryPackages.filter((p) => p.owner_id === userId && p.active);
-  const total = userPkgs.reduce((sum, p) => sum + p.credits_total, 0);
-  const used = userPkgs.reduce((sum, p) => sum + p.credits_used, 0);
-  return Math.max(0, total - used);
+  return load().inquiryPackages.filter(p => p.owner_id === userId && p.active)
+    .reduce((sum, p) => sum + Math.max(0, p.credits_total - p.credits_used), 0);
 }
-
-export function consumeUserInquiryMessage(userId: string): boolean {
-  const d = load();
-  const pkgs = d.inquiryPackages
-    .filter((p) => p.owner_id === userId && p.active && p.credits_used < p.credits_total)
-    .sort((a, b) => a.id - b.id);
-
-  if (pkgs.length > 0) {
-    pkgs[0].credits_used += 1;
-    save();
-    return true;
-  }
-  return false;
-}
+export function consumeUserInquiryMessage(_userId: string): boolean { return false; }
 
 function inquiryState(d: DB, requestId: number): InquiryStateLocal {
-  const req = d.requests.find((r) => r.id === requestId);
-  let inquiry_started_by = req ? (req as any).inquiry_started_by : null;
-
-  let pkg = null;
-  let remaining = 0;
-
-  if (inquiry_started_by) {
-    remaining = getUserInquiryBalance(inquiry_started_by);
-    pkg = [...d.inquiryPackages]
-      .filter((p) => p.owner_id === inquiry_started_by && p.active)
-      .sort((a, b) => b.id - a.id)[0] || null;
-  } else {
-    const currentUserId = getCurrentUserId();
-    remaining = getUserInquiryBalance(currentUserId);
-    pkg = [...d.inquiryPackages]
-      .filter((p) => p.owner_id === currentUserId && p.active)
-      .sort((a, b) => b.id - a.id)[0] || null;
-  }
-
   const messages = d.inquiryMessages
-    .filter((m) => m.request_id === requestId)
-    .filter((m) => {
-      // رسائل الإدارة تظهر دائماً
-      if (m.sender_id === 'admin') return true;
-      // الرسائل المرفوضة لا تظهر لأي طرف
-      if (m.rejected) return false;
-      // الرسائل غير الموافق عليها تظهر للمرسِل فقط (حتى تراجعها الإدارة)
-      if (!m.approved && m.sender_id !== getCurrentUserId()) return false;
-      return true;
-    })
+    .filter(m => m.request_id === requestId && m.sender_id === 'admin')
+    // لا نعيد نشر الترحيب الآلي القديم الذي يعلن الباقات الملغاة.
+    .filter(m => !m.text.startsWith('مرحباً بكما في غرفة الاستفسار'))
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
-
-  return { package: pkg, remaining, messages, inquiry_started_by };
+  return { package: null, remaining: 0, messages, inquiry_started_by: null };
 }
-
-// جلب تفاصيل الاستفسار
 export async function getInquiry(requestId: number): Promise<InquiryStateLocal> {
-  await delay(60);
   return inquiryState(load(), requestId);
 }
-
-export async function initializeInquiry(requestId: number, userId: string): Promise<{ ok: boolean; state?: InquiryStateLocal; error?: string }> {
-  await delay();
-  const d = load();
-  const req = d.requests.find((r) => r.id === requestId);
-  if (!req) return { ok: false, error: 'الطلب غير موجود' };
-
-  if (!(req as any).inquiry_started_by) {
-    const balance = getUserInquiryBalance(userId);
-    if (balance > 0) {
-      (req as any).inquiry_started_by = userId;
-      req.updated_at = new Date().toISOString();
-      
-      const hasWelcome = d.inquiryMessages.some(m => m.request_id === requestId && m.sender_id === 'admin');
-      if (!hasWelcome) {
-        d.inquiryMessages.push({
-          id: nextId(),
-          request_id: requestId,
-          sender_id: 'admin',
-          text: 'مرحباً بكما في غرفة الاستفسار والتوافق الجاد والموثق للزواج تحت إشراف المنصة. يتم خصم رسائل المحادثة (المرسلة والمستقبلة) من باقة العضو الذي بدأ الاستفسار.',
-          charged_to: null,
-          created_at: new Date().toISOString(),
-        });
-      }
-      save();
-    }
-  }
-
-  return { ok: true, state: inquiryState(d, requestId) };
+export async function initializeInquiry(_requestId: number, _userId: string): Promise<{ ok: boolean; state?: InquiryStateLocal; error?: string }> {
+  return { ok: false, error: MEMBER_MESSAGING_REMOVED };
 }
-
-export async function buyInquiry(requestId: number, ownerId: string): Promise<{ ok: boolean; state?: InquiryStateLocal; error?: string }> {
-  await delay();
-  const d = load();
-  const pkg: LocalInquiryPackage = {
-    id: nextId(), request_id: requestId, owner_id: ownerId,
-    credits_total: INQUIRY_CREDITS, credits_used: 0, price: INQUIRY_PRICE,
-    active: true, created_at: new Date().toISOString(),
-  };
-  d.inquiryPackages.push(pkg);
-
-  const req = d.requests.find((r) => r.id === requestId);
-  if (req && !(req as any).inquiry_started_by) {
-    (req as any).inquiry_started_by = ownerId;
-    req.updated_at = new Date().toISOString();
-  }
-
-  addEvent(d, requestId, ownerId, 'inquiry_buy', `تم شراء باقة استفسار (${INQUIRY_CREDITS} رسالة بسعر ${INQUIRY_PRICE} ريال)`);
-  
-  const hasWelcome = d.inquiryMessages.some(m => m.request_id === requestId && m.sender_id === 'admin');
-  if (!hasWelcome) {
-    d.inquiryMessages.push({
-      id: nextId(), request_id: requestId, sender_id: 'admin',
-      text: 'مرحباً بكما في غرفة الاستفسار والتوافق الجاد والموثق للزواج تحت إشراف المنصة. يتم خصم رسائل المحادثة (المرسلة والمستقبلة) من باقة العضو الذي بدأ الاستفسار.',
-      charged_to: null, created_at: new Date().toISOString(),
-    });
-  }
-
-  if (req) {
-    const otherId = ownerId === req.sender_id ? req.receiver_id : req.sender_id;
-    addNotification(d, otherId, req.id, 'inquiry', 'فتح الطرف الآخر غرفة الاستفسار وفعّل باقة الرسائل — يمكنك الرد من صفحة الاستفسار');
-  }
-  
-  save();
-  return { ok: true, state: inquiryState(d, requestId) };
+export async function buyInquiry(_requestId: number, _ownerId: string): Promise<{ ok: boolean; state?: InquiryStateLocal; error?: string }> {
+  return { ok: false, error: MEMBER_MESSAGING_REMOVED };
 }
-
-export async function buyMessagePackageCustom(userId: string, credits: number, price: number): Promise<{ ok: boolean; balance?: number; error?: string }> {
-  await delay();
-  const d = load();
-  const pkg: LocalInquiryPackage = {
-    id: nextId(),
-    request_id: 0,
-    owner_id: userId,
-    credits_total: credits,
-    credits_used: 0,
-    price: price,
-    active: true,
-    created_at: new Date().toISOString(),
-  };
-  d.inquiryPackages.push(pkg);
-  save();
-  return { ok: true, balance: getUserInquiryBalance(userId) };
+export async function buyMessagePackageCustom(_userId: string, _credits: number, _price: number): Promise<{ ok: boolean; balance?: number; error?: string }> {
+  return { ok: false, error: MEMBER_MESSAGING_REMOVED };
 }
-
 export async function sendInquiry(requestId: number, senderId: string, text: string): Promise<{ ok: boolean; state?: InquiryStateLocal; error?: string }> {
-  await delay();
+  if (senderId !== 'admin') return { ok: false, error: MEMBER_MESSAGING_REMOVED };
   const d = load();
-  if (!text || text.trim().length < 1) return { ok: false, error: 'الرسالة قصيرة جداً' };
-
-  const req = d.requests.find((r) => r.id === requestId);
+  if (!text?.trim()) return { ok: false, error: 'النص فارغ' };
+  const req = d.requests.find(r => r.id === requestId);
   if (!req) return { ok: false, error: 'الطلب غير موجود' };
-
   if (senderId === 'admin') {
     const msgId = nextId();
     d.inquiryMessages.push({
@@ -1550,105 +1425,26 @@ export async function sendInquiry(requestId: number, senderId: string, text: str
     return { ok: true, state: inquiryState(d, requestId) };
   }
 
-  let inquiry_started_by = (req as any).inquiry_started_by;
-  if (!inquiry_started_by) {
-    inquiry_started_by = senderId;
-    (req as any).inquiry_started_by = senderId;
-  }
-
-  const balance = getUserInquiryBalance(inquiry_started_by);
-  if (balance <= 0) {
-    return { ok: false, error: 'نَفَد رصيد باقة الاستفسار للشخص الذي بدأ الاستفسار. يرجى شحن باقة جديدة للمتابعة.' };
-  }
-
-  const consumed = consumeUserInquiryMessage(inquiry_started_by);
-  if (!consumed) {
-    return { ok: false, error: 'تعذّر استهلاك الرسالة، يرجى شحن الرصيد.' };
-  }
-
-  d.inquiryMessages.push({
-    id: nextId(), request_id: requestId, sender_id: senderId, text: text.trim(),
-    charged_to: inquiry_started_by, created_at: new Date().toISOString(),
-    approved: true,
-  });
-  const otherId = senderId === req.sender_id ? req.receiver_id : req.sender_id;
-  addNotification(d, otherId, requestId, 'inquiry', 'وصلتك رسالة جديدة في غرفة الاستفسار — افتح المحادثة للرد');
-  save();
-  return { ok: true, state: inquiryState(d, requestId) };
+  return { ok: false, error: MEMBER_MESSAGING_REMOVED };
 }
-
-export async function simulateReply(requestId: number, replierId: string, text: string): Promise<{ ok: boolean; state?: InquiryStateLocal; error?: string }> {
-  await delay(400);
-  const d = load();
-
-  const req = d.requests.find((r) => r.id === requestId);
-  if (!req) return { ok: false, error: 'الطلب غير موجود' };
-
-  const inquiry_started_by = (req as any).inquiry_started_by;
-  if (!inquiry_started_by) return { ok: false, error: 'لم يتم بدء الاستفسار بعد' };
-
-  const balance = getUserInquiryBalance(inquiry_started_by);
-  if (balance <= 0) {
-    return { ok: false, error: 'نَفَد رصيد الاستفسار' };
-  }
-
-  const consumed = consumeUserInquiryMessage(inquiry_started_by);
-  if (!consumed) return { ok: false, error: 'نَفَد الرصيد' };
-
-  d.inquiryMessages.push({
-    id: nextId(), request_id: requestId, sender_id: replierId, text,
-    charged_to: inquiry_started_by, created_at: new Date().toISOString(),
-  });
-  const otherId = replierId === req.sender_id ? req.receiver_id : req.sender_id;
-  addNotification(d, otherId, requestId, 'inquiry', 'وصلتك رسالة جديدة في غرفة الاستفسار — افتح المحادثة للرد');
-  save();
-  return { ok: true, state: inquiryState(d, requestId) };
+export async function simulateReply(_requestId: number, _replierId: string, _text: string): Promise<{ ok: boolean; state?: InquiryStateLocal; error?: string }> {
+  return { ok: false, error: MEMBER_MESSAGING_REMOVED };
 }
-
-// ===== مراجعة رسائل الاستفسار من قبل الإدارة =====
-export function getAllInquiryMessages(): (LocalInquiryMessage & { request_id: number })[] {
-  const d = load();
-  return d.inquiryMessages
-    .filter((m) => m.sender_id !== 'admin')
-    .sort((a, b) => b.created_at.localeCompare(a.created_at));
-}
-
-export function moderateInquiryMessage(
-  messageId: number,
-  action: 'approve' | 'reject',
-  moderatorName: string,
-): boolean {
-  const d = load();
-  const msg = d.inquiryMessages.find((m) => m.id === messageId);
-  if (!msg) return false;
-  msg.moderated_by = moderatorName;
-  msg.moderated_at = new Date().toISOString();
-  if (action === 'approve') {
-    msg.approved = true;
-    msg.rejected = false;
-  } else {
-    msg.approved = false;
-    msg.rejected = true;
-  }
-  save();
-  return true;
-}
-
+// نقاط التوافق القديمة غير تشغيلية؛ لا تعدل أو تحذف الأرشيف عند استدعائها.
+export function getAllInquiryMessages(): (LocalInquiryMessage & { request_id: number })[] { return []; }
+export function moderateInquiryMessage(_messageId: number, _action: 'approve' | 'reject', _moderatorName: string): boolean { return false; }
 export function updateInquiryMessage(messageId: number, newText: string): boolean {
-  const d = load();
-  const msg = d.inquiryMessages.find((m) => m.id === messageId);
-  if (!msg) return false;
+  const msg = load().inquiryMessages.find(m => m.id === messageId && m.sender_id === 'admin');
+  if (!msg || !newText.trim()) return false;
   msg.text = newText.trim();
-  (msg as any).updated_at = new Date().toISOString();
   save();
   return true;
 }
-
 export function deleteInquiryMessage(messageId: number): boolean {
   const d = load();
-  const idx = d.inquiryMessages.findIndex((m) => m.id === messageId);
-  if (idx === -1) return false;
-  d.inquiryMessages.splice(idx, 1);
+  const index = d.inquiryMessages.findIndex(m => m.id === messageId && m.sender_id === 'admin');
+  if (index < 0) return false;
+  d.inquiryMessages.splice(index, 1);
   save();
   return true;
 }
@@ -1659,7 +1455,7 @@ export async function getJourneyNotifications(userId: string): Promise<LocalNoti
   const d = load();
   if (!d.notifications) return [];
   return d.notifications
-    .filter((n) => n.user_id === userId || n.user_id === 'all')
+    .filter((n) => n.type !== 'inquiry' && (n.user_id === userId || n.user_id === 'all'))
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
@@ -1677,7 +1473,7 @@ export function markAllNotificationsRead(userId: string) {
 
 export function getUnreadNotificationsCount(userId: string): number {
   const d = load();
-  return (d.notifications || []).filter((n) => (n.user_id === userId || n.user_id === 'all') && !n.read).length;
+  return (d.notifications || []).filter((n) => n.type !== 'inquiry' && (n.user_id === userId || n.user_id === 'all') && !n.read).length;
 }
 
 export async function getActionableRequestsCount(userId: string): Promise<number> {
@@ -2727,6 +2523,7 @@ export function getTransactions(): any[] {
 }
 
 export function recordTransaction(tx: any) {
+  if (tx.type === 'inquiry') return false; // خدمة ملغاة؛ لا معاملات جديدة لها
   const transactions = getTransactions();
   transactions.unshift({
     id: 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
@@ -2740,6 +2537,7 @@ export function updateTransactionStatus(id: string, status: string): boolean {
   const transactions = getTransactions();
   const idx = transactions.findIndex((t) => t.id === id || t.id?.toString() === id?.toString());
   if (idx !== -1) {
+    if (transactions[idx].type === 'inquiry' && status === 'completed') return false;
     transactions[idx].status = status;
     try { setLocalSetting(TRANSACTIONS_KEY, JSON.stringify(transactions)); } catch { /* تجاهل */ }
     return true;

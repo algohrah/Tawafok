@@ -153,7 +153,7 @@ export class LocalStorageAdapter implements IDatabaseAdapter {
   markRequestSeen = (requestId: number) => localStore.markRequestSeen(requestId);
   markRequestNotificationsRead = (requestId: number, userId?: string) => localStore.markRequestNotificationsRead(requestId, userId);
 
-  // ===== غرفة الاستفسار (Inquiry room messaging) =====
+  // ===== توجيهات الإدارة وتوافق مخطط قديم؛ شراء/إرسال الأعضاء معطل نهائيًا =====
   getUserInquiryBalance = (userId: string) => localStore.getUserInquiryBalance(userId);
   consumeUserInquiryMessage = (userId: string) => localStore.consumeUserInquiryMessage(userId);
   getInquiry = (requestId: number) => localStore.getInquiry(requestId);

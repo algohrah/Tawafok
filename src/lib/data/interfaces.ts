@@ -49,7 +49,7 @@ export interface IDatabaseAdapter {
   markRequestSeen(requestId: number): void;
   markRequestNotificationsRead(requestId: number, userId?: string): void;
 
-  // ===== غرفة الاستفسار (Inquiry room messaging) =====
+  // ===== توجيهات الإدارة وتوافق مخطط قديم؛ شراء/إرسال الأعضاء معطل نهائيًا =====
   getUserInquiryBalance(userId: string): number;
   consumeUserInquiryMessage(userId: string): boolean;
   getInquiry(requestId: number): Promise<any>;
